@@ -1,9 +1,8 @@
 """World backup creation, rotation, listing, and restore.
 
-The original project shelled out to ``tar`` and only ran on Linux. This module
-uses :mod:`tarfile`/:mod:`zipfile` from the standard library so it produces
-identical archives on Windows, Linux, and macOS, and adds restore, retention
-by count *and* age, and integrity-friendly atomic writes.
+This module uses :mod:`tarfile`/:mod:`zipfile` from the standard library so it
+produces identical archives on Windows, Linux, and macOS, with restore,
+retention by count *and* age, and integrity-friendly atomic writes.
 """
 
 from __future__ import annotations

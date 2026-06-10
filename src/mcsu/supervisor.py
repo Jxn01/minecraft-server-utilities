@@ -1,4 +1,4 @@
-"""The supervisor: the mature evolution of the original control loop.
+"""The supervisor: the central control loop.
 
 ``mcsu run`` instantiates a :class:`Supervisor`, which owns the server process
 and orchestrates everything around it:

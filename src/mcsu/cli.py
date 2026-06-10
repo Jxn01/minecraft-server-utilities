@@ -82,10 +82,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_install)
 
     # versions
-    p = sub.add_parser("versions", help="list available Minecraft versions for a loader")
+    p = sub.add_parser(
+        "versions",
+        help="list installable versions/builds for a loader",
+        description="Without --mc-version, lists the Minecraft versions a loader supports. "
+        "With --mc-version, lists that loader's own builds/versions for it — the values "
+        "you can pass to `mcsu install --loader-version`.",
+    )
     p.add_argument("--loader", default="vanilla", help="loader to query")
+    p.add_argument(
+        "--mc-version",
+        default="",
+        help="list the loader's builds/versions for this Minecraft version",
+    )
     p.add_argument("--all", action="store_true", help="include snapshots/betas where applicable")
-    p.add_argument("--limit", type=int, default=25, help="max versions to show")
+    p.add_argument("--limit", type=int, default=25, help="max entries to show")
     p.set_defaults(func=cmd_versions)
 
     # run
@@ -208,20 +219,30 @@ def cmd_versions(args: argparse.Namespace) -> int:
 
     installer = ServerInstaller()
     loader = args.loader.lower()
-    if loader == "vanilla":
-        versions = installer.list_vanilla_versions(releases_only=not args.all)
-    else:
-        _error(
-            f"version listing is currently implemented for 'vanilla' (got {loader!r}). "
-            "Use `mcsu install --loader <loader> --mc-version latest`."
+    mc_version = args.mc_version or None
+    versions = installer.list_versions(loader, mc_version, include_unstable=args.all)
+    if mc_version:
+        heading = f"{loader} builds/versions for Minecraft {mc_version}"
+        hint = (
+            f"Install one with: mcsu install --loader {loader} "
+            f"--mc-version {mc_version} --loader-version <value>"
         )
-        return 2
+    else:
+        heading = f"Minecraft versions supported by {loader}"
+        hint = (
+            f"List a loader's own builds with: mcsu versions --loader {loader} --mc-version <ver>"
+        )
+
+    if not versions:
+        print(colorize(f"No versions found for {loader}.", "dim"))
+        return 0
     shown = versions[: args.limit]
-    print(colorize(f"Latest {len(shown)} {loader} versions:", "bold"))
+    print(colorize(f"{heading} (newest first, showing {len(shown)}):", "bold"))
     for v in shown:
         print(f"  {v}")
     if len(versions) > len(shown):
         print(colorize(f"  ... and {len(versions) - len(shown)} more", "dim"))
+    print(colorize(f"  {hint}", "dim"))
     return 0
 
 
