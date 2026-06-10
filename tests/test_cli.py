@@ -112,6 +112,19 @@ def test_versions_vanilla(monkeypatch, capsys):
     assert "and 1 more" in out
 
 
+def test_versions_loader_builds(monkeypatch, capsys):
+    # `versions --loader fabric --mc-version 1.21` lists loader versions.
+    monkeypatch.setattr(
+        "mcsu.installer.ServerInstaller.list_versions",
+        lambda self, loader, mc_version=None, *, include_unstable=False: ["0.16.5", "0.16.4"],
+    )
+    rc = main(["versions", "--loader", "fabric", "--mc-version", "1.21"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "0.16.5" in out
+    assert "--loader-version" in out  # actionable install hint
+
+
 def test_install_invokes_installer(monkeypatch, tmp_path, capsys):
     cfg = _init(tmp_path)
     from mcsu.installer import InstallResult

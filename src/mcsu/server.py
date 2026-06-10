@@ -1,7 +1,7 @@
 """Cross-platform Minecraft server process management.
 
-The original script relied on GNU ``screen``, which is Linux/macOS only and
-awkward to script against. This owns the Java process directly via
+Rather than wrapping a terminal multiplexer like ``screen`` (Linux/macOS only
+and awkward to script against), this owns the Java process directly via
 :mod:`subprocess`: it captures the console, lets you push commands to stdin,
 detects readiness and exit, and shuts the server down gracefully (``stop``
 then escalating to terminate/kill) on every platform.

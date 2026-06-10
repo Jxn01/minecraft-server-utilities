@@ -35,7 +35,6 @@ stand in for the real things, and installer tests mock HTTP.
 | `tests/` | Pytest suite, mirroring the modules. |
 | `deploy/` | systemd unit, Dockerfile. |
 | `docs/` | Configuration and deployment references. |
-| `legacy/` | The original `zsh` script this project grew from. |
 
 ## Guidelines
 

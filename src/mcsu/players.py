@@ -3,7 +3,7 @@
 Fed by player join/leave events (from the log parser or RCON ``list``), this
 keeps an in-memory set of who is online and persists per-player totals to a
 small JSON file so statistics survive restarts. This also powers the
-"skip backup if nobody has been online" optimization from the original script.
+"skip backup when nobody has been online" optimization.
 """
 
 from __future__ import annotations

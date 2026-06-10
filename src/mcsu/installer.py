@@ -154,6 +154,36 @@ class ServerInstaller:
         method = getattr(self, f"_install_{loader}")
         return method(mc_version, dest, loader_version)
 
+    # -- version discovery ------------------------------------------------- #
+
+    def list_versions(
+        self,
+        loader: str,
+        mc_version: str | None = None,
+        *,
+        include_unstable: bool = False,
+    ) -> list[str]:
+        """List installable versions for a loader, newest first.
+
+        The meaning of the result depends on the loader and whether a
+        ``mc_version`` is supplied:
+
+        * Without ``mc_version`` you get the **Minecraft versions** the loader
+          supports.
+        * With ``mc_version`` you get the **loader's own versions/builds** for
+          that Minecraft version — i.e. exactly the values you can pass to
+          ``mcsu install --loader-version`` (Paper/Folia build numbers,
+          Fabric/Quilt loader versions, Forge/NeoForge versions).
+
+        ``include_unstable`` widens vanilla to snapshots and Fabric/Quilt to
+        beta loaders.
+        """
+        loader = loader.lower()
+        if loader not in self.LOADERS:
+            raise InstallError(f"unknown loader {loader!r}; choose from {', '.join(self.LOADERS)}")
+        method = getattr(self, f"_versions_{loader}")
+        return method(mc_version, include_unstable)
+
     # -- vanilla ----------------------------------------------------------- #
 
     def list_vanilla_versions(self, *, releases_only: bool = True) -> list[str]:
@@ -164,6 +194,66 @@ class ServerInstaller:
 
     def latest_vanilla(self) -> str:
         return _get_json(_MOJANG_MANIFEST)["latest"]["release"]
+
+    def _versions_vanilla(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        return self.list_vanilla_versions(releases_only=not include_unstable)
+
+    def _versions_paper(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        return self._versions_papermc("paper", mc_version)
+
+    def _versions_folia(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        return self._versions_papermc("folia", mc_version)
+
+    def _versions_papermc(self, project: str, mc_version: str | None) -> list[str]:
+        if not mc_version:
+            versions = _get_json(f"{_PAPER_API}/{project}")["versions"]
+            return _flatten_paper_versions(versions)
+        builds = _get_json(f"{_PAPER_API}/{project}/versions/{mc_version}/builds")
+        return [str(b.get("id")) for b in builds]
+
+    def _versions_purpur(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        if not mc_version:
+            return list(reversed(_get_json(_PURPUR_API)["versions"]))
+        builds = _get_json(f"{_PURPUR_API}/{mc_version}").get("builds", {}).get("all", [])
+        return [str(b) for b in reversed(builds)]
+
+    def _versions_fabric(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        return self._versions_fabric_like(_FABRIC_API, mc_version, include_unstable)
+
+    def _versions_quilt(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        return self._versions_fabric_like(_QUILT_API, mc_version, include_unstable)
+
+    def _versions_fabric_like(
+        self, api: str, mc_version: str | None, include_unstable: bool
+    ) -> list[str]:
+        if not mc_version:
+            games = _get_json(f"{api}/versions/game")
+            return [g["version"] for g in games if include_unstable or g.get("stable")]
+        loaders = _get_json(f"{api}/versions/loader")
+        return [
+            entry["version"] for entry in loaders if include_unstable or entry.get("stable", True)
+        ]
+
+    def _versions_neoforge(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        versions = _parse_maven_versions(_get(_NEOFORGE_MAVEN).decode("utf-8"))
+        if mc_version:
+            parts = mc_version.split(".")
+            prefix = ".".join(parts[1:]) if len(parts) >= 2 else mc_version
+            versions = [v for v in versions if v.startswith(prefix)]
+        return list(reversed(versions))
+
+    def _versions_forge(self, mc_version: str | None, include_unstable: bool) -> list[str]:
+        versions = _parse_maven_versions(_get(_FORGE_MAVEN).decode("utf-8"))
+        if mc_version:
+            matching = [v for v in versions if v.startswith(f"{mc_version}-")]
+            return [v.split("-", 1)[1] for v in reversed(matching)]
+        # Distinct Minecraft versions Forge supports, newest first.
+        seen: list[str] = []
+        for v in reversed(versions):
+            mc = v.split("-", 1)[0]
+            if mc not in seen:
+                seen.append(mc)
+        return seen
 
     def _install_vanilla(
         self, mc_version: str, dest: Path, loader_version: str | None

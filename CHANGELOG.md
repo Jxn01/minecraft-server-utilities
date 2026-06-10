@@ -6,9 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [1.0.0] — 2026-06-10
 
-The original Linux-only `zsh` script is reborn as a cross-platform,
-dependency-free Python suite. The legacy script is preserved under
-[`legacy/`](legacy/server_utilities.zsh).
+Initial release of `mcsu`: a cross-platform, dependency-free Python suite for
+running and babysitting Minecraft servers.
 
 ### Added
 
@@ -24,7 +23,7 @@ dependency-free Python suite. The legacy script is preserved under
   stdlib sockets, including multi-packet responses.
 - **Rotating world backups** (`tar.gz`/`tar`/`zip`) with retention by count and
   age, consistent snapshots via `save-off`/`save-all`, traversal-safe restore,
-  and the original "skip if no players" optimization.
+  and a "skip backup when nobody's been online" optimization.
 - **Scheduled restarts** with in-game countdown broadcasts, supporting both
   fixed intervals and wall-clock daily times.
 - **Crash watchdog** with rate-limited auto-restart and crash-loop detection.

@@ -22,11 +22,8 @@ on a schedule with fair warning to players, taking consistent rotating world
 backups, talking to it over RCON, and pinging you on Discord when something
 happens.
 
-It began life as a 100-line `zsh` script (`screen` + `tar`, Linux-only — preserved
-in [`legacy/`](legacy/server_utilities.zsh)) and has been rebuilt into a
-cross-platform, tested, dependency-free Python package that keeps the original
-spirit — **set it and forget it** — while working everywhere and across every
-major loader.
+The design goal is **set it and forget it**: a tested, dependency-free Python
+package that works everywhere and across every major loader.
 
 > **Why it's interesting as a project:** a from-scratch [RCON protocol
 > implementation](src/mcsu/rcon.py), multi-API [server-jar
@@ -42,7 +39,7 @@ major loader.
 | 🧩 | **Every major loader.** Vanilla, Paper, Folia, Purpur, Fabric, Quilt, Forge, and NeoForge — resolved and downloaded from their official APIs, checksum-verified. |
 | 🔁 | **Scheduled restarts** with in-game countdown broadcasts (interval-based *and* wall-clock daily times). |
 | ❤️‍🩹 | **Crash watchdog** with rate-limited auto-restart and crash-loop detection. |
-| 💾 | **Rotating world backups** (`tar.gz`/`tar`/`zip`), retention by count *and* age, consistent snapshots via `save-off`/`save-all`, one-command restore, and the original "skip backup if nobody's been online" optimization. |
+| 💾 | **Rotating world backups** (`tar.gz`/`tar`/`zip`), retention by count *and* age, consistent snapshots via `save-off`/`save-all`, one-command restore, and a "skip backup when nobody's been online" optimization. |
 | 🎛️ | **First-class RCON.** One-shot `mcsu cmd`, an interactive `mcsu console`, and internal use for broadcasts and backup flushing. |
 | 🔔 | **Discord notifications** for readiness, crashes, backups, and (optionally) joins/leaves/chat. |
 | 👥 | **Player tracking** — who's online plus persistent play-time stats. |
@@ -97,17 +94,30 @@ mcsu stop                    # stop the server and exit the supervisor
 
 Everything is also available as `python -m mcsu ...`.
 
-## How it maps to the original script
+## Working with versions and loaders
 
-The original `server_utilities.zsh` did three things in one `while` loop. `mcsu`
-keeps all three and grows up around them:
+`mcsu` installs a specific build of any supported loader, and helps you discover
+what's available:
 
-| Original (zsh + `screen` + `tar`) | mcsu |
-|---|---|
-| Restart server if `screen` session is gone | [`watchdog`](src/mcsu/supervisor.py) — direct process supervision, rate-limited, crash-loop aware |
-| `tar -cf` the `world` dir, keep ≤ 48, skip if no players | [`backup`](src/mcsu/backup.py) — `tar.gz`/`zip`, count+age retention, consistent snapshots, restore, traversal-safe |
-| Timed restart with `say` countdown via `screen -X stuff` | [`restart`](src/mcsu/supervisor.py) — interval **and** daily-time restarts, countdown over RCON |
-| Linux + `zsh` + `screen` only | Windows / Linux / macOS, pure Python stdlib |
+```bash
+# What Minecraft versions does a loader support?
+mcsu versions --loader paper
+mcsu versions --loader fabric
+
+# What builds/loader-versions exist for a given Minecraft version?
+mcsu versions --loader paper  --mc-version 1.20.4   # -> Paper build numbers
+mcsu versions --loader fabric --mc-version 1.20.4   # -> Fabric loader versions
+mcsu versions --loader forge  --mc-version 1.20.4   # -> Forge versions
+
+# Pin an exact loader build:
+mcsu install --loader paper  --mc-version 1.20.4 --loader-version 497
+mcsu install --loader fabric --mc-version 1.20.4 --loader-version 0.16.5
+mcsu install --loader forge  --mc-version 1.20.4 --loader-version 49.0.11
+```
+
+Omit `--loader-version` (and/or `--mc-version`) to get the latest. Forge and
+NeoForge resolve and download the *installer* jar and print the one-time
+`--installServer` step to finish setup.
 
 ## Configuration
 

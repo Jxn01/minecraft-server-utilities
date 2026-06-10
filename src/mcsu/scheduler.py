@@ -1,7 +1,7 @@
 """A minimal, monotonic-clock task scheduler.
 
-Drives the periodic work the original loop hand-rolled with ``seconds %
-interval``: backups, scheduled restarts, and watchdog checks. Supports both
+Drives the periodic work of the supervisor — backups, scheduled restarts, and
+watchdog checks — from one place instead of ad-hoc modulo arithmetic. Supports both
 fixed intervals and wall-clock daily times, is driven from a single thread,
 and uses a monotonic clock so it is immune to system-clock jumps (NTP steps,
 DST) for interval tasks.
