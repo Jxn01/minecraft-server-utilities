@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.installed.cfg
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage / typing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Minecraft server runtime artifacts (never commit these) ---------------- #
+# mcsu runtime state
+.mcsu/
+# Server jars and worlds
+*.jar
+world/
+world_nether/
+world_the_end/
+backups/
+logs/
+crash-reports/
+banned-*.json
+ops.json
+whitelist.json
+usercache.json
+eula.txt
+server.properties
+# But keep example/test fixtures explicitly checked in
+!examples/**

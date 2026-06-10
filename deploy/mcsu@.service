@@ -1,0 +1,34 @@
+# systemd service template for mcsu — one instance per Minecraft server.
+#
+#   sudo cp deploy/mcsu@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mcsu@survival
+#
+# "survival" (the part after @) is the instance name and, by default, the
+# directory under /opt/minecraft. Adjust paths/user to your environment.
+
+[Unit]
+Description=Minecraft server (%i) supervised by mcsu
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=minecraft
+Group=minecraft
+WorkingDirectory=/opt/minecraft/%i
+ExecStart=/usr/local/bin/mcsu run --no-console
+# Graceful stop: ask mcsu to stop the server and exit, allowing a long save.
+ExecStop=/usr/local/bin/mcsu stop
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=10
+
+# Hardening (loosen if your setup needs more access).
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
