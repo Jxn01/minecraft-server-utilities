@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcsu"
+version = "1.0.0"
+description = "Minecraft Server Utilities — cross-platform tooling to run, back up, and babysit Minecraft servers across versions and mod loaders."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "minecraft_server_utilities contributors" }]
+keywords = [
+    "minecraft",
+    "server",
+    "rcon",
+    "backup",
+    "watchdog",
+    "paper",
+    "fabric",
+    "forge",
+    "devops",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: System :: Systems Administration",
+    "Typing :: Typed",
+]
+
+# Zero required runtime dependencies — the entire suite is standard library.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "mypy>=1.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/jxn01/minecraft_server_utilities"
+Repository = "https://github.com/jxn01/minecraft_server_utilities"
+Issues = "https://github.com/jxn01/minecraft_server_utilities/issues"
+
+[project.scripts]
+mcsu = "mcsu.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcsu"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["mcsu"]
+branch = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W", "C4", "SIM", "RUF"]
+ignore = [
+    "B008",   # function call in default argument — used intentionally for dataclass factories
+    "SIM105", # contextlib.suppress is not always clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+# The TOML template uses long, intentionally column-aligned inline comments.
+"src/mcsu/_toml_template.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["mcsu"]
+mypy_path = "src"
+warn_unused_ignores = false
+ignore_missing_imports = true
