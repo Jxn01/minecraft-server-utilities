@@ -35,4 +35,4 @@ running and babysitting Minecraft servers.
 - Full test suite (pytest), type checking (mypy), linting/formatting (ruff),
   multi-OS / multi-Python CI, and systemd/Docker deployment templates.
 
-[1.0.0]: https://github.com/jxn01/minecraft_server_utilities/releases/tag/v1.0.0
+[1.0.0]: https://github.com/jxn01/minecraft-server-utilities/releases/tag/v1.0.0

@@ -13,7 +13,7 @@ The repo ships ready-to-use templates in [`deploy/`](../deploy/).
 1. Install mcsu system-wide (or in a virtualenv) and create your server:
 
    ```bash
-   sudo python3 -m pip install /path/to/minecraft_server_utilities
+   sudo python3 -m pip install /path/to/minecraft-server-utilities
    sudo useradd --system --home /opt/minecraft --shell /usr/sbin/nologin minecraft
    sudo -u minecraft mcsu init --dir /opt/minecraft/survival --loader paper --mc-version 1.20.4
    sudo -u minecraft sh -c 'cd /opt/minecraft/survival && mcsu install'

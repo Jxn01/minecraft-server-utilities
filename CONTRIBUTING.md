@@ -6,8 +6,8 @@ focused changes with tests.
 ## Development setup
 
 ```bash
-git clone https://github.com/jxn01/minecraft_server_utilities
-cd minecraft_server_utilities
+git clone https://github.com/jxn01/minecraft-server-utilities
+cd minecraft-server-utilities
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```

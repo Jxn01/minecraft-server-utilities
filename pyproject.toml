@@ -9,7 +9,7 @@ description = "Minecraft Server Utilities — cross-platform tooling to run, bac
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "minecraft_server_utilities contributors" }]
+authors = [{ name = "minecraft-server-utilities contributors" }]
 keywords = [
     "minecraft",
     "server",
@@ -48,9 +48,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jxn01/minecraft_server_utilities"
-Repository = "https://github.com/jxn01/minecraft_server_utilities"
-Issues = "https://github.com/jxn01/minecraft_server_utilities/issues"
+Homepage = "https://github.com/jxn01/minecraft-server-utilities"
+Repository = "https://github.com/jxn01/minecraft-server-utilities"
+Issues = "https://github.com/jxn01/minecraft-server-utilities/issues"
 
 [project.scripts]
 mcsu = "mcsu.cli:main"
