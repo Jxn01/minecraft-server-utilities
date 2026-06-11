@@ -59,3 +59,4 @@ events = ["server_ready", "server_stopped", "server_crashed", "backup_completed"
 notify_player_join = false
 notify_player_leave = false
 notify_chat = false
+
