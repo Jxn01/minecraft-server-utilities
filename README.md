@@ -4,7 +4,7 @@
 
 **Run, back up, and babysit Minecraft servers across versions and mod loaders — on Windows and Linux, with zero runtime dependencies.**
 
-[![CI](https://github.com/jxn01/minecraft_server_utilities/actions/workflows/ci.yml/badge.svg)](https://github.com/jxn01/minecraft_server_utilities/actions/workflows/ci.yml)
+[![CI](https://github.com/jxn01/minecraft-server-utilities/actions/workflows/ci.yml/badge.svg)](https://github.com/jxn01/minecraft-server-utilities/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
@@ -50,12 +50,12 @@ package that works everywhere and across every major loader.
 
 ```bash
 # From a clone (recommended while iterating):
-git clone https://github.com/jxn01/minecraft_server_utilities
-cd minecraft_server_utilities
+git clone https://github.com/jxn01/minecraft-server-utilities
+cd minecraft-server-utilities
 pip install .
 
 # ...or directly from Git:
-pip install "git+https://github.com/jxn01/minecraft_server_utilities"
+pip install "git+https://github.com/jxn01/minecraft-server-utilities"
 ```
 
 Requires **Python 3.11+** and a **Java** runtime appropriate for your Minecraft
@@ -180,11 +180,11 @@ See [`docs/configuration.md`](docs/configuration.md) for every option.
    (child)    └─────▲──────┘                    └──────┬───────┘
                     │ stdin / RCON                     │ structured events
                     │                                  ▼
-              ┌─────┴───────────────── Supervisor ─────────────────┐
+              ┌─────┴──────────────── Supervisor ─────────────┐
               │  scheduler · watchdog · backups · player tracker   │
-              └───────────────────────┬────────────────────────────┘
+              └───────────────────────┬──────────────────────┘
                                       │ EventBus
-                  ┌───────────────────┼────────────────────┐
+                  ┌───────────────────┼───────────────────┐
                   ▼                   ▼                     ▼
             notifications        state file            (your plugin)
 ```

@@ -34,7 +34,7 @@ from typing import Any
 
 from mcsu.errors import InstallError
 
-_USER_AGENT = "mcsu/1.0 (+https://github.com/jxn01/minecraft_server_utilities)"
+_USER_AGENT = "mcsu/1.0 (+https://github.com/jxn01/minecraft-server-utilities)"
 _TIMEOUT = 30.0
 
 ProgressHook = Callable[[int, int], None]  # (bytes_done, total_bytes)
