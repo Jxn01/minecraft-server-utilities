@@ -180,11 +180,11 @@ See [`docs/configuration.md`](docs/configuration.md) for every option.
    (child)    └─────▲──────┘                    └──────┬───────┘
                     │ stdin / RCON                     │ structured events
                     │                                  ▼
-              ┌─────┴──────────────── Supervisor ─────────────┐
+              ┌─────┴───────────────── Supervisor ─────────────────┐
               │  scheduler · watchdog · backups · player tracker   │
-              └───────────────────────┬──────────────────────┘
+              └───────────────────────┬────────────────────────────┘
                                       │ EventBus
-                  ┌───────────────────┼───────────────────┐
+                  ┌───────────────────┼────────────────────┐
                   ▼                   ▼                     ▼
             notifications        state file            (your plugin)
 ```
