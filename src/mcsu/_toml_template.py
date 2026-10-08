@@ -42,6 +42,12 @@ def render_template(config: ServerConfig) -> str:
     )
     add(f"jar = {_toml_value(c.jar)}")
     add(
+        f"launch = {_toml_value(c.launch)}           # jar | args_files (Forge/NeoForge 1.17+: @unix_args.txt)"
+    )
+    add(
+        f'args_files = {_toml_value(c.args_files)}            # with launch = "args_files"; leave out user_jvm_args.txt'
+    )
+    add(
         f"loader = {_toml_value(c.loader)}          # vanilla|paper|purpur|fabric|forge|neoforge|quilt"
     )
     add(f"mc_version = {_toml_value(c.mc_version)}")

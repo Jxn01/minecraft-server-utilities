@@ -41,6 +41,12 @@ The repo ships ready-to-use templates in [`deploy/`](../deploy/).
 `Restart=on-failure` in the unit is a backstop; mcsu's own watchdog handles
 in-process crash recovery first.
 
+### A fleet (many servers, one running)
+
+For several prepared servers of which one runs at a time, use the fleet daemon
+instead of one `mcsu@` unit per server: [`deploy/mcsu-fleet.service`](../deploy/mcsu-fleet.service)
+runs `mcsu fleet run` for a directory of servers. See [fleet.md](fleet.md).
+
 ## Windows — NSSM
 
 [NSSM](https://nssm.cc/) turns any program into a Windows service.

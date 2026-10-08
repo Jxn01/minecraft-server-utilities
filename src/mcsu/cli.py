@@ -158,12 +158,150 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--online", action="store_true", help="show only who is online (via RCON)")
     p.set_defaults(func=cmd_players)
 
+    # fleet
+    p = sub.add_parser(
+        "fleet",
+        help="many prepared servers, one running: the fleet daemon and its controls",
+        description="A fleet is a directory of mcsu servers (each with its own mcsu.toml) plus a "
+        "fleet.toml. `mcsu fleet run` keeps at most one of them running, switches on request "
+        "(countdown + backup), resumes after a reboot, writes status.json and can expose it all "
+        "to Home Assistant over MQTT. The other subcommands talk to the running daemon.",
+    )
+    p.add_argument("--fleet", default=None, help="path to fleet.toml (default: ./fleet.toml)")
+    fsub = p.add_subparsers(dest="fleet_action", metavar="<action>")
+    fp = fsub.add_parser("run", help="run the fleet daemon in the foreground")
+    fp.set_defaults(func=cmd_fleet_run)
+    fp = fsub.add_parser("list", help="list the fleet's servers")
+    fp.set_defaults(func=cmd_fleet_list)
+    fp = fsub.add_parser("status", help="show the daemon's status document")
+    fp.add_argument("--json", action="store_true", help="print status.json as is")
+    fp.set_defaults(func=cmd_fleet_status)
+    fp = fsub.add_parser("start", help="switch to a server (stops the running one first)")
+    fp.add_argument("server", help="the server's directory name (see `mcsu fleet list`)")
+    fp.set_defaults(func=cmd_fleet_start)
+    fp = fsub.add_parser("stop", help="stop the running server (the daemon keeps running)")
+    fp.set_defaults(func=cmd_fleet_stop)
+    fp = fsub.add_parser("whitelist", help="add or remove a player on EVERY server")
+    fp.add_argument("action", choices=["add", "remove"])
+    fp.add_argument("player", help="Java Edition player name")
+    fp.set_defaults(func=cmd_fleet_whitelist)
+    p.set_defaults(func=lambda a: _fail("specify: fleet run|list|status|start|stop|whitelist"))
+
     return parser
 
 
 # --------------------------------------------------------------------------- #
 # Command handlers
 # --------------------------------------------------------------------------- #
+
+
+def _fleet(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+    from mcsu.fleet import load_fleet
+
+    return load_fleet(args.fleet)
+
+
+def cmd_fleet_run(args: argparse.Namespace) -> int:
+    from mcsu.fleet import FleetDaemon
+
+    daemon = FleetDaemon(_fleet(args))
+
+    def handle_signal(signum, _frame):  # type: ignore[no-untyped-def]
+        _info(f"Received signal {signum}; stopping the fleet gracefully...")
+        daemon.shutdown()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    _info(f"Fleet daemon: {len(daemon.members)} servers")
+    return daemon.run()
+
+
+def cmd_fleet_list(args: argparse.Namespace) -> int:
+    from mcsu.fleet import discover
+
+    fleet = _fleet(args)
+    members = discover(fleet)
+    width = max(len(m.name) for m in members)
+    for m in members:
+        print(f"  {m.name:<{width}}  {m.title}  ({m.version})")
+    return 0
+
+
+def cmd_fleet_status(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from mcsu.fleet import daemon_pid, read_status
+
+    fleet = _fleet(args)
+    doc = read_status(fleet)
+    if doc is None:
+        return _fail("no status yet: is `mcsu fleet run` running?", 1)
+    if args.json:
+        print(_json.dumps(doc, indent=2))
+        return 0
+    pid = daemon_pid(fleet)
+    print(
+        colorize(f"Fleet: {doc['fleet']}", "bold")
+        + ("" if pid else colorize("  (daemon not running)", "yellow"))
+    )
+    if doc.get("active"):
+        players = ", ".join(doc["players"]) or "nobody"
+        print(f"  Active:  {doc['active_title']} ({doc['version']}) -- {doc['state']}")
+        print(f"  Players: {doc['players_online']} ({players})")
+        if doc.get("last_backup"):
+            print(f"  Last backup: {doc['last_backup']}")
+    else:
+        print(
+            "  Active:  none"
+            + (colorize("  (last server crashed)", "red") if doc.get("crash_loop") else "")
+        )
+    if doc.get("last_action"):
+        print(f"  Last action: {doc['last_action']}")
+    return 0
+
+
+def cmd_fleet_start(args: argparse.Namespace) -> int:
+    from mcsu.fleet import discover, send_command
+
+    fleet = _fleet(args)
+    if args.server not in {m.name for m in discover(fleet)}:
+        return _fail(f"no server named {args.server!r} (see `mcsu fleet list`)", 1)
+    send_command(fleet, "start", args.server)
+    _ok(f"Asked the fleet daemon to switch to {args.server}")
+    return 0
+
+
+def cmd_fleet_stop(args: argparse.Namespace) -> int:
+    from mcsu.fleet import send_command
+
+    send_command(_fleet(args), "stop")
+    _ok("Asked the fleet daemon to stop the running server")
+    return 0
+
+
+def cmd_fleet_whitelist(args: argparse.Namespace) -> int:
+    from mcsu.fleet import daemon_pid, discover, send_command
+    from mcsu.whitelist import add_to_file, remove_from_file, valid_player_name
+
+    fleet = _fleet(args)
+    if not valid_player_name(args.player):
+        return _fail(f"{args.player!r} is not a valid Java Edition player name", 1)
+    if daemon_pid(fleet):
+        send_command(fleet, f"whitelist_{args.action}", args.player)
+        _ok(f"Asked the fleet daemon to {args.action} {args.player} on every server")
+        return 0
+    # No daemon: nothing is running, so editing every whitelist.json directly is complete.
+    changed = 0
+    for m in discover(fleet):
+        directory = m.config.server_dir
+        did = (
+            add_to_file(directory, args.player)
+            if args.action == "add"
+            else remove_from_file(directory, args.player)
+        )
+        changed += did
+    _ok(f"{args.action}: {args.player} on {changed} server(s) (daemon not running; files edited)")
+    return 0
 
 
 def cmd_init(args: argparse.Namespace) -> int:

@@ -44,6 +44,10 @@ package that works everywhere and across every major loader.
 | 🔔 | **Discord notifications** for readiness, crashes, backups, and (optionally) joins/leaves/chat. |
 | 👥 | **Player tracking** — who's online plus persistent play-time stats. |
 | ⚙️ | **`server.properties` & EULA management**, RCON auto-configuration, and a friendly `mcsu init` scaffold. |
+| 🗂️ | **Fleet mode.** Keep many servers prepared and run one at a time: switch with a player countdown and a backup of the outgoing world, resume after a reboot, crash-loop detection, a `status.json` for status pages — [`docs/fleet.md`](docs/fleet.md). |
+| 🏠 | **Home Assistant over MQTT discovery.** Pick the active server, see players, back up, restart and whitelist from a dashboard — with a from-scratch MQTT 3.1.1 client, still dependency-free — [`docs/home-assistant.md`](docs/home-assistant.md). |
+| 🧾 | **Fleet-wide whitelist** that writes the UUID each server expects (Mojang's for online mode, the derived offline UUID otherwise), running or not. |
+| 🧩 | **Modern Forge/NeoForge launch** from `@unix_args.txt` argument files, and a per-server Java path for packs that need Java 8, 17 or 21. |
 | 🪶 | **Zero runtime dependencies.** Pure standard library. Easy to audit, trivial to deploy. |
 
 ## Install
@@ -164,6 +168,21 @@ events = ["server_ready", "server_crashed", "backup_completed"]
 
 See [`docs/configuration.md`](docs/configuration.md) for every option.
 
+## Many servers, one running: fleet mode
+
+```bash
+# servers/fleet.toml beside servers/survival/, servers/skyblock/, ... (each an mcsu server)
+mcsu fleet --fleet servers/fleet.toml run            # the daemon (systemd: deploy/mcsu-fleet.service)
+mcsu fleet --fleet servers/fleet.toml list
+mcsu fleet --fleet servers/fleet.toml start skyblock  # countdown, backup, stop the old one, start this one
+mcsu fleet --fleet servers/fleet.toml whitelist add Steve   # on every server at once
+mcsu fleet --fleet servers/fleet.toml status
+```
+
+Add a `[homeassistant]` table and the whole fleet appears in Home Assistant as one
+device with an *Active server* picker. See [`docs/fleet.md`](docs/fleet.md) and
+[`docs/home-assistant.md`](docs/home-assistant.md).
+
 ## Running it as a service
 
 `mcsu run` is a well-behaved foreground process (it stops the server cleanly on
@@ -192,7 +211,10 @@ See [`docs/configuration.md`](docs/configuration.md) for every option.
 Each box is an independent, separately tested module under
 [`src/mcsu/`](src/mcsu/). The [`EventBus`](src/mcsu/events.py) decouples the
 control loop from consumers, so adding a metrics exporter or web dashboard is a
-single subscriber.
+single subscriber. **Fleet mode** ([`fleet.py`](src/mcsu/fleet.py)) runs one such
+Supervisor at a time inside a `FleetDaemon`, whose status listeners feed the Home
+Assistant bridge ([`homeassistant.py`](src/mcsu/homeassistant.py) over
+[`mqtt.py`](src/mcsu/mqtt.py)).
 
 ## Development
 

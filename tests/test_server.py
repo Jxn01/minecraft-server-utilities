@@ -79,3 +79,30 @@ def test_send_when_not_running_raises(server_dir, fake_java):
     proc = _make(server_dir, fake_java)
     with pytest.raises(ServerError, match="not running"):
         proc.send("list")
+
+
+def test_args_files_launch_puts_jvm_flags_before_the_argument_files(server_dir, fake_java):
+    proc = ServerProcess(
+        server_dir=server_dir,
+        jar="unused.jar",
+        java_path=str(fake_java),
+        args_files=["@libraries/net/minecraftforge/forge/1.20.1-47.2.0/unix_args.txt"],
+        extra_flags=["-XX:+UseG1GC"],
+        min_memory="6G",
+        max_memory="6G",
+    )
+    cmd = proc.build_command()
+    assert "-jar" not in cmd
+    args_at = cmd.index("@libraries/net/minecraftforge/forge/1.20.1-47.2.0/unix_args.txt")
+    # Every JVM option must precede the file that names the main class.
+    for flag in ("-Xms6G", "-Xmx6G", "-XX:+UseG1GC"):
+        assert cmd.index(flag) < args_at
+    assert cmd[-1] == "nogui"
+
+
+def test_args_files_must_exist(tmp_path, fake_java):
+    proc = ServerProcess(
+        server_dir=tmp_path, jar="x.jar", java_path=str(fake_java), args_files=["unix_args.txt"]
+    )
+    with pytest.raises(ServerError, match="argument file not found"):
+        proc.start()

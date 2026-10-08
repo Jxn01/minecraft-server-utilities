@@ -1,0 +1,37 @@
+# mcsu fleet configuration -- many prepared servers, at most one running.
+# Every key is documented in docs/fleet.md. Put this file beside the server
+# directories (each with its own mcsu.toml) and run `mcsu fleet run`.
+
+[fleet]
+name = "minecraft"                 # topic / entity-id prefix and status document name
+root = "."                         # subdirectories holding an mcsu.toml are the servers
+address = "mc.example.org"         # what players type to join (status document)
+state_dir = ".fleet"               # state.json, status.json, control, daemon.pid
+public_status_file = ""            # e.g. "../www/status.json" for a public status page
+status_interval = 30               # seconds between status rewrites when idle
+resume = true                      # start the previously active server after a restart
+backup_on_switch = true            # back up the outgoing world if it was played
+switch_warning_seconds = [60, 30, 10, 5, 4, 3, 2, 1]
+switch_message = "This server is closing in {time}: switching to {next}."
+stop_message = "This server is closing in {time}."
+shutdown_warning_seconds = 10      # countdown when the daemon itself stops (host shutdown)
+
+# Optional per-server display overrides, keyed by directory name.
+[servers.survival]
+title = "Survival (Paper 1.21)"
+description = "Vanilla client"
+
+[servers.oldpack]
+hidden = true                      # keep a directory out of the fleet
+
+# Optional: control the fleet from Home Assistant over MQTT (docs/home-assistant.md).
+[homeassistant]
+enabled = false
+broker = "homeassistant.local"
+port = 1883
+username = "minecraft"
+password_file = "/opt/minecraft/.mqtt-password"
+discovery_prefix = "homeassistant"
+base_topic = "mcsu"
+device_name = "Minecraft"
+keepalive = 30

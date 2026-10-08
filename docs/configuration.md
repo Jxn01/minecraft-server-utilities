@@ -16,7 +16,9 @@ A complete, commented example lives at
 |---|---|---|---|
 | `name` | string | `"minecraft"` | Label used in logs, status, and notifications. |
 | `directory` | string | `"."` | Server working directory, **relative to the config file**. |
-| `jar` | string | `"server.jar"` | Server jar filename (relative to `directory`). |
+| `jar` | string | `"server.jar"` | Server jar filename (relative to `directory`). Unused with `launch = "args_files"`. |
+| `launch` | string | `"jar"` | `jar` starts `java ... -jar <jar>`; `args_files` starts `java ... @file ...` instead — what Forge/NeoForge 1.17+ ship (their `run.sh` is `java @user_jvm_args.txt @libraries/.../unix_args.txt`). |
+| `args_files` | list | `[]` | With `launch = "args_files"`: the argument files, relative to `directory`, with or without the leading `@`. **Leave `user_jvm_args.txt` out** — mcsu passes memory and JVM flags itself, and that file's `-Xmx` would override them. |
 | `loader` | string | `"vanilla"` | `vanilla`, `paper`, `folia`, `purpur`, `fabric`, `quilt`, `forge`, `neoforge`. Informational + used as the `install` default. |
 | `mc_version` | string | `""` | Minecraft version, e.g. `1.20.4`. |
 | `stop_timeout` | int (s) | `90` | How long to wait for a graceful `stop` before escalating to terminate/kill. |
@@ -33,7 +35,12 @@ A complete, commented example lives at
 | `server_args` | list | `["nogui"]` | Arguments passed to the server jar. |
 
 The launch command is:
-`java -Xms<min> -Xmx<max> <extra_flags...> -jar <jar> <server_args...>`
+`java -Xms<min> -Xmx<max> <extra_flags...> -jar <jar> <server_args...>`,
+or with `launch = "args_files"`:
+`java -Xms<min> -Xmx<max> <extra_flags...> @<args_file>... <server_args...>`
+(the argument files carry the classpath and main class, so every JVM option
+comes before them). Several servers on one machine can each name their own
+Java in `path` — Java 8 for 1.7–1.16 packs, 17 for 1.17–1.20.4, 21 for 1.20.5+.
 
 ## `[rcon]`
 

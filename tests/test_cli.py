@@ -137,3 +137,46 @@ def test_install_invokes_installer(monkeypatch, tmp_path, capsys):
     rc = main(["-c", str(cfg), "install", "--loader", "paper", "--mc-version", "1.20.4"])
     assert rc == 0
     assert "Downloaded paper" in capsys.readouterr().out
+
+
+def _fleet(tmp_path):
+    root = tmp_path / "fleet"
+    for name, title, online in (("alpha", "Alpha Pack", "false"), ("beta", "Beta World", "false")):
+        d = root / name
+        d.mkdir(parents=True)
+        (d / "mcsu.toml").write_text(
+            f'[server]\nname = "{title}"\nloader = "paper"\nmc_version = "1.18.2"\n'
+        )
+        (d / "server.properties").write_text(f"online-mode={online}\n")
+    (root / "fleet.toml").write_text('[fleet]\nname = "t"\n')
+    return root
+
+
+def test_fleet_list(tmp_path, capsys):
+    root = _fleet(tmp_path)
+    assert main(["fleet", "--fleet", str(root), "list"]) == 0
+    out = capsys.readouterr().out
+    assert "alpha" in out and "Beta World" in out and "Paper 1.18.2" in out
+
+
+def test_fleet_status_without_a_daemon(tmp_path, capsys):
+    root = _fleet(tmp_path)
+    assert main(["fleet", "--fleet", str(root), "status"]) == 1
+    assert "no status yet" in capsys.readouterr().err
+
+
+def test_fleet_whitelist_without_a_daemon_edits_every_file(tmp_path, capsys):
+    import json
+
+    root = _fleet(tmp_path)
+    assert main(["fleet", "--fleet", str(root), "whitelist", "add", "Steve"]) == 0
+    for name in ("alpha", "beta"):
+        assert json.loads((root / name / "whitelist.json").read_text())[0]["name"] == "Steve"
+    assert main(["fleet", "--fleet", str(root), "whitelist", "add", "bad name"]) == 1
+
+
+def test_fleet_start_rejects_unknown_servers_and_queues_known_ones(tmp_path, capsys):
+    root = _fleet(tmp_path)
+    assert main(["fleet", "--fleet", str(root), "start", "nope"]) == 1
+    assert main(["fleet", "--fleet", str(root), "start", "beta"]) == 0
+    assert '"start"' in (root / ".fleet" / "control").read_text()

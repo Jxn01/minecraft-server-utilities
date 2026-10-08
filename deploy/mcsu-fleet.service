@@ -1,0 +1,34 @@
+# systemd unit for an mcsu fleet: many prepared servers, at most one running.
+#
+#   sudo cp deploy/mcsu-fleet.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mcsu-fleet
+#
+# /opt/minecraft holds fleet.toml and one subdirectory per server (each with its
+# own mcsu.toml). See docs/fleet.md. Adjust paths/user to your environment.
+
+[Unit]
+Description=Minecraft server fleet supervised by mcsu
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=minecraft
+Group=minecraft
+WorkingDirectory=/opt/minecraft
+ExecStart=/usr/local/bin/mcsu fleet run
+# SIGTERM: the daemon warns players (shutdown_warning_seconds), backs up a played world,
+# stops the server cleanly and remembers it for the next start. Allow for all of that.
+TimeoutStopSec=300
+Restart=on-failure
+RestartSec=10
+
+# Hardening (loosen if your setup needs more access).
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

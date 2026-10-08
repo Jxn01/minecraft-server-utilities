@@ -76,6 +76,10 @@ class Supervisor:
         self._restart_times: deque[float] = deque()
         self._restarts_total = 0
         self._intentional_stop = False
+        # True once the watchdog stopped trying (crash loop, or a crash with the
+        # watchdog disabled): run() then returns on its own. Fleet mode reads it.
+        self.gave_up = False
+        self._crash_handled: ServerProcess | None = None  # the process whose crash is being handled
 
         self._setup_notifications()
         self._configure_schedules()
@@ -138,6 +142,37 @@ class Supervisor:
         """Request a graceful, warned restart of the server."""
         self._restart_requested.set()
 
+    # -- embedding API (used by fleet mode) ----------------------------------- #
+
+    @property
+    def ready(self) -> bool:
+        """True while the server is up and has printed its "Done" line."""
+        return self._ready.is_set()
+
+    @property
+    def server_pid(self) -> int | None:
+        proc = self._proc
+        return proc.pid if proc and proc.is_running() else None
+
+    @property
+    def online_players(self) -> list[str]:
+        return self.players.online
+
+    def broadcast(self, message: str) -> None:
+        """Say ``message`` in-game (RCON when available, otherwise the console)."""
+        self._say(message)
+
+    def console(self, command: str) -> bool:
+        """Run a server console command over stdin -- works without RCON. False if not running."""
+        proc = self._proc
+        if proc is None or not proc.is_running():
+            return False
+        try:
+            proc.send(command)
+            return True
+        except Exception:
+            return False
+
     # -- environment prep -------------------------------------------------- #
 
     def _prepare_environment(self) -> None:
@@ -162,6 +197,7 @@ class Supervisor:
             server_dir=self.config.server_dir,
             jar=self.config.jar,
             java_path=j.path,
+            args_files=self.config.args_files if self.config.launch == "args_files" else None,
             min_memory=j.min_memory,
             max_memory=j.max_memory,
             extra_flags=j.extra_flags,
@@ -290,7 +326,7 @@ class Supervisor:
                     if not self._shutdown.is_set():
                         self._start_server()
                 else:
-                    self._handle_crash(proc.returncode)
+                    self._handle_crash(proc.returncode, proc)
             self._shutdown.wait(1.0)
 
     # -- restart with countdown ------------------------------------------- #
@@ -357,11 +393,17 @@ class Supervisor:
         if proc is None or self._intentional_stop or self._shutdown.is_set():
             return
         if not proc.is_running():
-            self._handle_crash(proc.returncode)
+            self._handle_crash(proc.returncode, proc)
 
-    def _handle_crash(self, returncode: int | None) -> None:
-        if self._shutdown.is_set():
-            return
+    def _handle_crash(self, returncode: int | None, proc: ServerProcess | None = None) -> None:
+        # Both the main loop and the watchdog notice a dead server. Without this guard both
+        # handled the same crash -- two state writes racing, and potentially two restarts.
+        with self._lock:
+            if self._shutdown.is_set() or (proc is not None and proc is not self._proc):
+                return
+            if proc is not None and proc is self._crash_handled:
+                return
+            self._crash_handled = proc
         wd = self.config.watchdog
         log.warning("Server exited unexpectedly (code=%s)", returncode)
         self.players.clear_online()
@@ -374,6 +416,7 @@ class Supervisor:
         self._write_state("crashed")
 
         if not wd.enabled:
+            self.gave_up = True
             self._shutdown.set()
             return
 
@@ -392,6 +435,7 @@ class Supervisor:
                 f"Crash loop detected ({wd.max_restarts} restarts in {format_duration(window)}); "
                 "supervisor is stopping. Investigate the server logs.",
             )
+            self.gave_up = True
             self._shutdown.set()
             return
 

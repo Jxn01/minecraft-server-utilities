@@ -6,6 +6,8 @@
 name = "survival"              # label used in logs & notifications
 directory = "."             # server working dir, relative to this file
 jar = "server.jar"
+launch = "jar"           # jar | args_files (Forge/NeoForge 1.17+: @unix_args.txt)
+args_files = []            # with launch = "args_files"; leave out user_jvm_args.txt
 loader = "paper"          # vanilla|paper|purpur|fabric|forge|neoforge|quilt
 mc_version = "1.20.4"
 stop_timeout = 90              # seconds to wait for a graceful stop

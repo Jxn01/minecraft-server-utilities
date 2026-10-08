@@ -36,6 +36,7 @@ class ServerProcess:
         server_dir: str | Path,
         jar: str,
         java_path: str | None = None,
+        args_files: list[str] | None = None,
         min_memory: str = "2G",
         max_memory: str = "4G",
         extra_flags: list[str] | None = None,
@@ -44,6 +45,8 @@ class ServerProcess:
     ) -> None:
         self.server_dir = Path(server_dir).resolve()
         self.jar = jar
+        # Non-empty = launch with `@file` argument files instead of `-jar <jar>`.
+        self.args_files = [a.removeprefix("@") for a in (args_files or [])]
         self.java_path = find_java(java_path)
         self.min_memory = min_memory
         self.max_memory = max_memory
@@ -62,7 +65,13 @@ class ServerProcess:
     def build_command(self) -> list[str]:
         cmd = [self.java_path, f"-Xms{self.min_memory}", f"-Xmx{self.max_memory}"]
         cmd.extend(self.extra_flags)
-        cmd.extend(["-jar", self.jar])
+        if self.args_files:
+            # The argument files carry the classpath and main class, so they come
+            # after every JVM option (a JVM option after the main class would be
+            # passed to the server as an argument instead).
+            cmd.extend(f"@{a}" for a in self.args_files)
+        else:
+            cmd.extend(["-jar", self.jar])
         cmd.extend(self.server_args)
         return cmd
 
@@ -92,9 +101,16 @@ class ServerProcess:
         with self._lock:
             if self.is_running():
                 raise ServerError("server is already running")
-            jar_path = self.server_dir / self.jar
-            if not jar_path.is_file():
-                raise ServerError(f"server jar not found: {jar_path}. Run `mcsu install` first.")
+            if self.args_files:
+                for name in self.args_files:
+                    if not (self.server_dir / name).is_file():
+                        raise ServerError(f"argument file not found: {self.server_dir / name}")
+            else:
+                jar_path = self.server_dir / self.jar
+                if not jar_path.is_file():
+                    raise ServerError(
+                        f"server jar not found: {jar_path}. Run `mcsu install` first."
+                    )
             popen_kwargs: dict[str, object] = {
                 "cwd": str(self.server_dir),
                 "stdin": subprocess.PIPE,

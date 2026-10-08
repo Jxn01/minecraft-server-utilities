@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -29,6 +30,9 @@ class RuntimeState:
     extra: dict[str, object] = field(default_factory=dict)
 
 
+_WRITE_LOCK = threading.Lock()
+
+
 class StateStore:
     """Atomic reader/writer for the runtime state file."""
 
@@ -46,10 +50,13 @@ class StateStore:
         return RuntimeState(**{k: v for k, v in data.items() if k in known})
 
     def write(self, state: RuntimeState) -> None:
+        # Several threads of one supervisor write this (main loop, watchdog, backups): a shared
+        # temp name let one thread's replace() steal the other's file mid-write.
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
-        tmp.replace(self.path)
+        tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        with _WRITE_LOCK:
+            tmp.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
+            tmp.replace(self.path)
 
     def clear(self) -> None:
         self.path.unlink(missing_ok=True)

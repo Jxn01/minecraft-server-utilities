@@ -130,6 +130,13 @@ class ServerConfig:
     name: str = "minecraft"
     directory: str = "."
     jar: str = "server.jar"
+    # How the JVM is started: "jar" runs `java ... -jar <jar>`; "args_files" runs
+    # `java ... @file1 @file2` instead -- what Forge/NeoForge 1.17+ ship (their
+    # run.sh is `java @user_jvm_args.txt @libraries/.../unix_args.txt`). mcsu's
+    # own JVM flags (memory, extra_flags) always come first, so leave
+    # user_jvm_args.txt out of `args_files`: its -Xmx would otherwise win.
+    launch: str = "jar"  # jar | args_files
+    args_files: list[str] = field(default_factory=list)
     # Free-form metadata, surfaced in `mcsu status` and notifications.
     loader: str = "vanilla"  # vanilla|paper|purpur|fabric|forge|neoforge|quilt
     mc_version: str = ""
@@ -184,6 +191,12 @@ class ServerConfig:
             )
         if not 0 <= self.backup.compression_level <= 9:
             raise ConfigError("backup.compression_level must be between 0 and 9")
+        if self.launch not in {"jar", "args_files"}:
+            raise ConfigError(f"server.launch must be 'jar' or 'args_files' (got {self.launch!r})")
+        if self.launch == "args_files" and not self.args_files:
+            raise ConfigError(
+                "server.launch = 'args_files' needs at least one entry in server.args_files"
+            )
         if self.rcon.enabled and not (0 < self.rcon.port < 65536):
             raise ConfigError(f"rcon.port out of range: {self.rcon.port}")
         for t in self.restart.daily_times:

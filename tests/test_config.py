@@ -86,3 +86,18 @@ def test_derived_paths(tmp_path):
     assert cfg.server_dir == (tmp_path / "world_srv").resolve()
     assert cfg.jar_path.name == "server.jar"
     assert cfg.state_dir.name == ".mcsu"
+
+
+def test_launch_mode_validation():
+    import pytest
+
+    from mcsu.config import config_from_dict
+    from mcsu.errors import ConfigError
+
+    cfg = config_from_dict({"server": {"launch": "args_files", "args_files": ["unix_args.txt"]}})
+    assert cfg.launch == "args_files" and cfg.args_files == ["unix_args.txt"]
+    assert config_from_dict({}).launch == "jar"
+    with pytest.raises(ConfigError, match="needs at least one"):
+        config_from_dict({"server": {"launch": "args_files"}})
+    with pytest.raises(ConfigError, match="'jar' or 'args_files'"):
+        config_from_dict({"server": {"launch": "exe"}})

@@ -175,3 +175,37 @@ def test_control_file_stop(server_dir, fake_java):
     finally:
         sup.shutdown()
         thread.join(timeout=5)
+
+
+def test_one_crash_is_handled_once_even_when_two_threads_see_it(server_dir, fake_java):
+    """Regression: the main loop AND the watchdog both noticed the same dead process and both
+    handled it -- racing state writes, and two restarts of one server."""
+    cfg = _config(
+        server_dir,
+        fake_java,
+        watchdog={"enabled": True, "max_restarts": 5, "restart_window": 600, "restart_backoff": 0},
+    )
+    sup = Supervisor(cfg, console_mirror=False)
+    from types import SimpleNamespace
+
+    dead = SimpleNamespace(pid=None, is_running=lambda: False)
+    sup._proc = dead  # type: ignore[assignment]
+    starts = []
+
+    def fake_start():  # a restart replaces the process
+        starts.append(1)
+        sup._proc = SimpleNamespace(pid=None, is_running=lambda: True)  # type: ignore[assignment]
+
+    sup._start_server = fake_start  # type: ignore[method-assign]
+    barrier = threading.Barrier(2)
+
+    def report():
+        barrier.wait()
+        sup._handle_crash(1, dead)  # type: ignore[arg-type]
+
+    threads = [threading.Thread(target=report) for _ in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(10)
+    assert starts == [1], "exactly one restart per crash"
