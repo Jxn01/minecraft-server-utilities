@@ -51,7 +51,7 @@ RCON is how `mcsu` (and you) send commands to a running server.
 | `enabled` | bool | `true` | Enable RCON features. |
 | `host` | string | `"127.0.0.1"` | RCON host. |
 | `port` | int | `25575` | RCON port. |
-| `password` | string | `""` | RCON password. When set, `mcsu run` writes the matching `enable-rcon`/`rcon.port`/`rcon.password` keys into `server.properties` automatically. |
+| `password` | string | `""` | RCON password. When set, `mcsu run` writes the matching `enable-rcon`/`rcon.port`/`rcon.password` keys into `server.properties` automatically. Because the file then holds the password, on Linux/macOS mcsu makes it owner-only (`0600`) when it writes it, and removes any permission for *others* at every start. The file keeps its encoding (ISO-8859-1 before Minecraft 1.20, UTF-8 after) and every line mcsu does not change keeps its exact bytes. |
 | `timeout` | float (s) | `5.0` | Socket timeout. |
 
 > **Tip:** set a non-empty `password` so `mcsu` can broadcast restart countdowns

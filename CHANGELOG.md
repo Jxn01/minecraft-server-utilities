@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.3] — 2026-10-08
+
+### Fixed
+
+- **`server.properties` with an ISO-8859-1 character stopped the server from
+  starting**: mcsu read the file as strict UTF-8, but Minecraft before 1.20
+  reads and writes ISO-8859-1, so a hand-edited accent (say in the `motd`)
+  raised `UnicodeDecodeError` before launch. The file is now read as UTF-8 when
+  it is UTF-8 and as ISO-8859-1 otherwise, written back in the same encoding
+  (untouched lines keep their exact bytes), and values follow Java's escapes:
+  `Properties.get` decodes `\uXXXX` (Minecraft writes `§` colour codes that
+  way), `Properties.set` writes non-ASCII as `\uXXXX`.
+
+### Security
+
+- **The RCON password was readable by every local user**: mcsu writes it into
+  `server.properties`, whose mode was left as it was (typically `0644`). On
+  Linux/macOS the file is now made owner-only (`0600`) whenever mcsu writes the
+  password, and any permission for *others* is removed at every start.
+
 ## [1.1.2] — 2026-10-08
 
 ### Fixed

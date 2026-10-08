@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import os
+import stat
+
+import pytest
+
 from mcsu.properties import (
     Properties,
     accept_eula,
@@ -68,3 +73,66 @@ def test_ensure_rcon_creates_file(tmp_path):
     changed = ensure_rcon_settings(tmp_path, port=25575, password="pw")
     assert changed is True
     assert (tmp_path / "server.properties").is_file()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_writing_the_rcon_password_makes_the_file_owner_only(tmp_path):
+    path = tmp_path / "server.properties"
+    path.write_text(SAMPLE, encoding="utf-8")
+    path.chmod(0o664)
+    ensure_rcon_settings(tmp_path, port=25575, password="secret")
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600, "a password must not be readable by others"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_a_file_without_rcon_changes_keeps_its_mode(tmp_path):
+    path = tmp_path / "server.properties"
+    path.write_text("enable-rcon=true\nrcon.port=25575\nrcon.password=pw\n", encoding="utf-8")
+    path.chmod(0o640)
+    assert ensure_rcon_settings(tmp_path, port=25575, password="pw") is False
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
+
+
+def test_an_iso_8859_1_file_loads_and_round_trips_byte_for_byte(tmp_path):
+    """Minecraft before 1.20 reads and writes server.properties as ISO-8859-1. A hand-edited
+    accent there used to crash mcsu at start (UnicodeDecodeError) before the server launched."""
+    path = tmp_path / "server.properties"
+    motd = "motd=J\xf3zsi szervere\n".encode("iso-8859-1")  # one non-UTF-8 byte
+    path.write_bytes(motd + b"max-players=8\n")
+    props = Properties.load(path)
+    assert props.get("motd") == "J\xf3zsi szervere"
+    ensure_rcon_settings(tmp_path, port=25575, password="pw")
+    data = path.read_bytes()
+    assert data.startswith(motd), "the untouched line must keep its original bytes"
+    assert b"rcon.password=pw\n" in data
+
+
+def test_values_outside_ascii_are_written_as_java_escapes(tmp_path):
+    path = tmp_path / "server.properties"
+    path.write_bytes(b"max-players=8\n")
+    props = Properties.load(path)
+    props.set("motd", "Szia \u0151 \u2603")  # one Latin-2 letter, one beyond Latin-1
+    props.save(path)
+    assert b"motd=Szia \\u0151 \\u2603\n" in path.read_bytes()
+    assert Properties.load(path).get("motd") == "Szia \u0151 \u2603"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_a_password_file_readable_by_others_is_closed_even_when_unchanged(tmp_path):
+    path = tmp_path / "server.properties"
+    path.write_text("enable-rcon=true\nrcon.port=25575\nrcon.password=pw\n", encoding="utf-8")
+    path.chmod(0o664)
+    assert ensure_rcon_settings(tmp_path, port=25575, password="pw") is False
+    assert stat.S_IMODE(path.stat().st_mode) == 0o660
+
+
+def test_java_escapes_are_decoded_and_malformed_ones_survive():
+    props = Properties.loads(
+        "motd=\\u00A7aGreen \\u00e9 \\ud83d\\ude00\nlevel-name=a\\:b\\=c\nbad=\\u12x4\n"
+    )
+    assert props.get("motd") == "\u00a7aGreen \u00e9 \U0001f600"  # incl. a surrogate pair
+    assert props.get("level-name") == "a:b=c"
+    assert props.get("bad") == "u12x4"
+    out = Properties()
+    out.set("motd", "\u00a7aGreen \U0001f600")
+    assert out.dumps() == "motd=\\u00A7aGreen \\uD83D\\uDE00\n"
