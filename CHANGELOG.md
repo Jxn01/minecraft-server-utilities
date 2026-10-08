@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.5] — 2026-10-08
+
+### Fixed
+
+- **Home Assistant showed the *Player name* as `unknown`**: it starts empty, and
+  mcsu published it as an empty *retained* MQTT message, which a broker treats
+  as "delete the retained message", so Home Assistant never received a state.
+  The `player` topic now carries JSON (`{"name": "..."}`) read back by the
+  discovery's `value_template`; no retained message mcsu publishes is ever
+  empty (guarded by a test).
+
 ## [1.1.4] — 2026-10-08
 
 ### Fixed

@@ -66,7 +66,7 @@ Under `<base_topic>/<node>/` (default `mcsu/<node>/`):
 |---|---|---|
 | `availability` | mcsu → HA | `online` / `offline` (retained; `offline` is the last-will) |
 | `state` | mcsu → HA | The full [status document](fleet.md#the-status-document-statusjson) as JSON (retained) |
-| `player` | mcsu → HA | The current *Player name* (retained) |
+| `player` | mcsu → HA | The current *Player name* as JSON, `{"name": "Steve"}` (retained; JSON because an empty retained payload would delete the retained message) |
 | `cmd/active` | HA → mcsu | A server title, or `Off` |
 | `cmd/player` | HA → mcsu | A player name |
 | `cmd/restart`, `cmd/backup`, `cmd/stop` | HA → mcsu | `PRESS` |

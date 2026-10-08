@@ -196,6 +196,7 @@ def discovery_messages(
             icon="mdi:account-edit",
             command_topic=f"{base}/cmd/player",
             state_topic=f"{base}/player",
+            value_template="{{ value_json.name }}",
             min=0,
             max=16,
             pattern="^[A-Za-z0-9_]{0,16}$",
@@ -266,7 +267,7 @@ class HomeAssistantBridge:
         ):
             client.publish(topic, json.dumps(payload), qos=1, retain=True)
         client.publish(f"{self.base}/availability", "online", qos=1, retain=True)
-        client.publish(f"{self.base}/player", self.player, qos=1, retain=True)
+        self._publish_player(client)
         if self._last_doc is not None:
             client.publish(f"{self.base}/state", json.dumps(self._last_doc), qos=1, retain=True)
         log.info("Home Assistant discovery published for %d servers", len(self.titles()))
@@ -285,7 +286,7 @@ class HomeAssistantBridge:
             self.daemon.request("start", member.name)
         elif command == "player":
             self.player = text[:16]
-            self.client.publish(f"{self.base}/player", self.player, qos=1, retain=True)
+            self._publish_player(self.client)
         elif command in ("restart", "backup", "stop") and text == "PRESS":
             self.daemon.request(command)
         elif command in ("whitelist_add", "whitelist_remove") and text == "PRESS":
@@ -293,6 +294,11 @@ class HomeAssistantBridge:
                 self.daemon.request(command, self.player)
         else:
             log.debug("ignoring %s = %r", topic, text)
+
+    def _publish_player(self, client: Any) -> None:
+        # As JSON: the name starts empty, and an EMPTY retained payload tells the broker to delete
+        # the retained message -- Home Assistant would never receive a state and show "unknown".
+        client.publish(f"{self.base}/player", json.dumps({"name": self.player}), qos=1, retain=True)
 
     # -- state --------------------------------------------------------------- #
 

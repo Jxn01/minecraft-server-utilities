@@ -129,9 +129,25 @@ def test_commands_are_routed_to_the_daemon(daemon: FleetDaemon) -> None:
         ("whitelist_add", "Steve"),
         ("whitelist_remove", "Steve"),
     ]
-    assert ("mcsu/jxn_server/player", "Steve", 1, True) in bridge.client.published, (
+    assert ("mcsu/jxn_server/player", '{"name": "Steve"}', 1, True) in bridge.client.published, (
         "text state echoed"
     )
+
+
+def test_no_retained_message_is_ever_empty(daemon: FleetDaemon) -> None:
+    """Regression: the player name started as "" -- and an EMPTY retained publish means "delete the
+    retained message" to a broker, so Home Assistant never received a state and showed 'unknown'."""
+    bridge = daemon.bridge
+    bridge._on_connect(bridge.client)
+    daemon._publish_status(force=True)
+    retained = [(t, p) for t, p, _q, r in bridge.client.published if r]
+    assert retained, "nothing retained was published"
+    assert [t for t, p in retained if p in ("", b"")] == []
+    # The name travels as JSON and the discovery reads it back through a template.
+    player = json.loads(dict(retained)["mcsu/jxn_server/player"])
+    assert player == {"name": ""}
+    config = json.loads(next(p for t, p in retained if t.endswith("/player/config")))
+    assert config["value_template"] == "{{ value_json.name }}"
 
 
 def test_state_is_published_retained_as_json(daemon: FleetDaemon) -> None:
