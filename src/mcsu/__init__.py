@@ -11,7 +11,7 @@ The public API is intentionally small; most users interact through the
 
 from __future__ import annotations
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 __author__ = "Minecraft Server Utilities contributors"
 __license__ = "MIT"
 

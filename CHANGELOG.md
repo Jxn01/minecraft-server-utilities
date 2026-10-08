@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.4] — 2026-10-08
+
+### Fixed
+
+- **Fleet mode started servers with a stale `mcsu.toml`**: each server's
+  configuration was read once, when the daemon started, so an edit (Java flags,
+  memory, a `-javaagent:` patch) silently waited for a daemon restart while the
+  file said otherwise. The daemon now reads a server's `mcsu.toml` every time it
+  starts it; a broken file is refused before the running server is stopped.
+
 ## [1.1.3] — 2026-10-08
 
 ### Fixed

@@ -413,6 +413,9 @@ class FleetDaemon:
         if name == self._active and self._thread and self._thread.is_alive():
             return
         member = self.members[name]
+        # Its mcsu.toml as it is NOW: an edit since the daemon started (Java flags, memory, ...)
+        # applies at this start. A broken file raises here, before the running server is touched.
+        member.config = load_config(self.fleet.root_dir / name / DEFAULT_CONFIG_NAME)
         if self._active is not None:
             self._stop_active(next_title=member.title)
         with self._lock:

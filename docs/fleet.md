@@ -130,6 +130,13 @@ modpacks:
   (1.17–1.20.4) or 21 (1.20.5+). A `-javaagent:` for a Log4Shell patch goes in
   `[java] extra_flags`.
 
+**When edits apply.** A server's `mcsu.toml` is read again every time the
+daemon starts that server (a start, a switch, a resume), so an edit applies at
+its next start — a running server keeps the settings it was started with until
+then. A broken `mcsu.toml` is refused at that start, before the running server
+is touched (`last_action` says why). `fleet.toml` itself, and the list of
+servers, are read when the daemon starts: restart it after changing them.
+
 ---
 
 ## Command line

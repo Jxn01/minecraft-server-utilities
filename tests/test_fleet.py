@@ -238,6 +238,24 @@ def test_a_crash_the_watchdog_recovers_reads_restarting_never_running(
         assert not daemon.status_document()["crash_loop"]
 
 
+def test_a_server_starts_with_its_mcsu_toml_as_it_is_now(fleet_dir: Path) -> None:
+    """Regression: configs were read once, when the daemon started -- an edit (Java flags, memory)
+    silently waited for a daemon restart, and a check of the file said it had applied."""
+    with Running(fleet_dir) as daemon:
+        daemon.request("start", "alpha")
+        assert wait_for(lambda: running_state(daemon) == "running")
+        toml = fleet_dir / "beta" / "mcsu.toml"
+        toml.write_text(toml.read_text().replace("[java]\n", '[java]\nmax_memory = "3G"\n'))
+        daemon.request("start", "beta")
+        assert wait_for(lambda: daemon.active == "beta" and running_state(daemon) == "running")
+        assert daemon._sup.config.java.max_memory == "3G"
+        # A broken edit is refused at start -- and the running server is left alone.
+        (fleet_dir / "alpha" / "mcsu.toml").write_text("[server\n")
+        daemon.request("start", "alpha")
+        assert wait_for(lambda: "failed" in daemon.status_document()["last_action"])
+        assert daemon.active == "beta" and running_state(daemon) == "running"
+
+
 def test_cli_commands_arrive_through_the_control_file(fleet_dir: Path) -> None:
     with Running(fleet_dir) as daemon:
         send_command(load_fleet(fleet_dir), "start", "alpha")
