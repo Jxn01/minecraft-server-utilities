@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.2] — 2026-10-08
+
+### Fixed
+
+- **A crashed server read `running`** in fleet mode while its watchdog was
+  restarting it: the fleet only ever moved *to* `running`, never away from it,
+  so Home Assistant, `status.json` and `mcsu fleet status` showed a server up
+  that was not. A crash now reads the new state **`restarting`** (with
+  `last_action` = `<title> crashed; restarting (auto-restart #N)`) until the
+  server is up again; a planned restart reads `starting`. See the states table
+  in `docs/fleet.md`.
+- **State changes reached `status.json` and Home Assistant only at the next
+  `status_interval`** (30 s by default) when they came from the server itself
+  (finished starting, crashed) rather than from a command. They are now written
+  and published at once, as the documentation already said.
+- **Crash loops of slow-booting servers were never caught.** `restart_window`
+  was a wall-clock window, so a modpack that boots for longer than
+  `restart_window / max_restarts` and crashes right after "Done" booted and
+  crashed forever. A crash now counts when it comes within `restart_window` of
+  the server's own (re)start; a server that stayed up for a whole window starts
+  the count afresh.
+- **A healthy server could be handled as crashed** when a health check read the
+  process in the instant between a restart building it and starting it: the
+  "crash" restarted it again, leaving a second server process on the same
+  world. The crash handler now re-checks under its lock that the process really
+  exited.
+
 ## [1.1.1] — 2026-10-08
 
 ### Fixed

@@ -51,8 +51,11 @@ daemon starts again — after a reboot, a power cut or `systemctl restart` — a
 `shutdown_warning_seconds`) **without** clearing that choice; only an explicit
 stop clears it.
 
-**Crash loops.** Each server's own `[watchdog]` restarts it after a crash. If the
-watchdog gives up (too many crashes within `restart_window`), the daemon marks
+**Crash loops.** Each server's own `[watchdog]` restarts it after a crash; while
+it is down and coming back the fleet reads `restarting` (never `running`), with
+`last_action` = `<title> crashed; restarting (auto-restart #N)`. If the
+watchdog gives up (more than `max_restarts` crashes in a row, each within
+`restart_window` of its start), the daemon marks
 the fleet `crashed`, sets `crash_loop = true` in the status document, clears the
 active choice so the next start does **not** resume into the loop, and reports
 the last action. Starting any server clears the flag.
@@ -156,7 +159,7 @@ Written to `<state_dir>/status.json` (and, minus `memory_mib`/`last_action`, to
 | `generated` | ISO 8601 (UTC) | When this document was written |
 | `active` | string \| null | Directory name of the active server |
 | `active_title` | string \| null | Its title |
-| `state` | string | `stopped`, `starting`, `running`, `switching`, `stopping` or `crashed` |
+| `state` | string | One of the [states](#states) below |
 | `crash_loop` | bool | The last server's watchdog gave up |
 | `players` | list of string | Players online on the active server |
 | `players_online` | int | `len(players)` |
@@ -167,6 +170,20 @@ Written to `<state_dir>/status.json` (and, minus `memory_mib`/`last_action`, to
 | `memory_mib` | int \| null | The server JVM's resident memory (Linux only) |
 | `last_action` | string | What the last command did, e.g. `Whitelisted Steve on 18 server(s)` |
 | `servers` | list | Every server: `name`, `title`, `description`, `loader`, `mc_version`, `version`, `state`, `max_players` |
+
+### States
+
+| `state` | Meaning |
+|---|---|
+| `stopped` | No server is running (`Off`). |
+| `starting` | The active server is booting — after a start, a switch, a resume or a planned (scheduled or requested) restart — and has not printed its "Done" line yet. |
+| `running` | Up and accepting players. |
+| `restarting` | It **crashed** and its watchdog is restarting it (`last_action` says which auto-restart). Becomes `running` once it is up again, or `crashed` if the watchdog gives up. |
+| `switching` | Warning players, backing up and stopping the old server before starting another. |
+| `stopping` | The same, with nothing to follow. |
+| `crashed` | The watchdog gave up (crash loop): the server is left stopped, `crash_loop` is `true`, and it is not resumed. |
+
+In `servers`, every server but the active one reads `stopped`.
 
 ---
 

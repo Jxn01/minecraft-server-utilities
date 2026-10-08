@@ -73,7 +73,8 @@ class Supervisor:
         self._lock = threading.RLock()
 
         # Sliding window of recent auto-restart timestamps for rate-limiting.
-        self._restart_times: deque[float] = deque()
+        self._restart_times: deque[float] = deque()  # crashes in a row, each soon after a start
+        self._started_at: float | None = None  # monotonic time of the last (re)start
         self._restarts_total = 0
         self._intentional_stop = False
         # True once the watchdog stopped trying (crash loop, or a crash with the
@@ -150,6 +151,11 @@ class Supervisor:
         return self._ready.is_set()
 
     @property
+    def restarts(self) -> int:
+        """How many times the watchdog has restarted a crashed server during this run."""
+        return self._restarts_total
+
+    @property
     def server_pid(self) -> int | None:
         proc = self._proc
         return proc.pid if proc and proc.is_running() else None
@@ -218,6 +224,7 @@ class Supervisor:
                 name=self.config.name,
             )
             self._write_state("starting")
+            self._started_at = time.monotonic()
             self._proc.start()
             log.info(
                 "Server process started (pid=%s): %s",
@@ -403,6 +410,10 @@ class Supervisor:
                 return
             if proc is not None and proc is self._crash_handled:
                 return
+            if proc is not None and proc.is_running():
+                # A stale check: it read the process before it was started (a restart builds,
+                # then starts it). It is up now -- handling it would start a second server.
+                return
             self._crash_handled = proc
         wd = self.config.watchdog
         log.warning("Server exited unexpectedly (code=%s)", returncode)
@@ -422,18 +433,23 @@ class Supervisor:
 
         now = time.monotonic()
         window = wd.restart_window
-        while self._restart_times and now - self._restart_times[0] > window:
-            self._restart_times.popleft()
+        # A crash counts toward the loop unless the server stayed up for a whole window first.
+        # Measured from its own (re)start, not as a wall-clock window: a modpack that boots for
+        # longer than window / max_restarts and dies right after "Done" is still a loop.
+        if self._started_at is not None and now - self._started_at >= window:
+            self._restart_times.clear()
         if wd.max_restarts > 0 and len(self._restart_times) >= wd.max_restarts:
             log.error(
-                "Reached %d restarts within %ds; giving up to avoid a crash loop.",
-                wd.max_restarts,
+                "Crashed %d times in a row, each within %ds of starting; giving up to avoid a "
+                "crash loop.",
+                wd.max_restarts + 1,
                 window,
             )
             self.bus.emit(
                 EventType.SERVER_ERROR,
-                f"Crash loop detected ({wd.max_restarts} restarts in {format_duration(window)}); "
-                "supervisor is stopping. Investigate the server logs.",
+                f"Crash loop detected ({wd.max_restarts + 1} crashes in a row, each within "
+                f"{format_duration(window)} of starting); supervisor is stopping. "
+                "Investigate the server logs.",
             )
             self.gave_up = True
             self._shutdown.set()

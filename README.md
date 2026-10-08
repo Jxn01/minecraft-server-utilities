@@ -158,7 +158,7 @@ warning_seconds = [300, 60, 30, 10, 5, 4, 3, 2, 1]
 
 [watchdog]
 enabled = true
-max_restarts = 5              # within restart_window before giving up
+max_restarts = 5              # crashes in a row (each within restart_window of starting)
 
 [notifications]
 enabled = true

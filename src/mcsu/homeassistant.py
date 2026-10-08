@@ -11,8 +11,9 @@ Entity                 What it does
 Active server (select) ``Off`` + every server's title. Choosing one switches to
                        it (players get a countdown, the old world a backup);
                        ``Off`` stops the running server.
-State (sensor)         stopped / starting / running / switching / stopping /
-                       crashed
+State (sensor)         stopped / starting / running / restarting (crashed, the
+                       watchdog is bringing it back) / switching / stopping /
+                       crashed (the watchdog gave up)
 Players online         count; the ``players`` attribute lists the names
 Server (sensor)        loader and Minecraft version of the active server
 Online since           when the active server finished starting (timestamp)

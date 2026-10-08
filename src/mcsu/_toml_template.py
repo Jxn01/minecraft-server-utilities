@@ -107,7 +107,7 @@ def render_template(config: ServerConfig) -> str:
     add(f"enabled = {_toml_value(w.enabled)}")
     add(f"check_interval = {w.check_interval}")
     add(
-        f"max_restarts = {w.max_restarts}            # within restart_window before giving up (0 = unlimited)"
+        f"max_restarts = {w.max_restarts}            # crashes in a row, each within restart_window of starting (0 = unlimited)"
     )
     add(f"restart_window = {w.restart_window}")
     add(f"restart_backoff = {w.restart_backoff}")

@@ -23,7 +23,14 @@ def _toml_path(p: Path) -> str:
 
 
 def make_server(
-    root: Path, name: str, java: Path, *, title: str | None = None, online: bool = False
+    root: Path,
+    name: str,
+    java: Path,
+    *,
+    title: str | None = None,
+    online: bool = False,
+    max_restarts: int = 1,
+    backoff: int = 0,
 ) -> Path:
     d = root / name
     d.mkdir(parents=True)
@@ -50,9 +57,9 @@ enabled = false
 enabled = false
 [watchdog]
 check_interval = 1
-max_restarts = 1
+max_restarts = {max_restarts}
 restart_window = 600
-restart_backoff = 0
+restart_backoff = {backoff}
 """
     )
     return d
@@ -201,6 +208,34 @@ def test_a_crash_loop_is_reported_and_never_resumed(
         assert doc["active"] is None and doc["state"] == "crashed"
         assert "crashed" in doc["last_action"]
     assert json.loads((fleet_dir / ".fleet/state.json").read_text())["active"] is None
+
+
+def test_a_crash_the_watchdog_recovers_reads_restarting_never_running(
+    tmp_path: Path, fake_java: Path
+) -> None:
+    root = tmp_path / "fleet"
+    make_server(root, "alpha", fake_java, title="Alpha Pack", max_restarts=3, backoff=3)
+    # A long status interval: a state change must reach listeners (Home Assistant) at once.
+    (root / "fleet.toml").write_text(
+        '[fleet]\nname = "test"\nstatus_interval = 60\nswitch_warning_seconds = []\n'
+    )
+    with Running(root) as daemon:
+        pushed: list[str] = []
+        daemon.add_status_listener(lambda doc: pushed.append(doc["state"]))
+        daemon.request("start", "alpha")
+        assert wait_for(lambda: running_state(daemon) == "running")
+        assert wait_for(lambda: pushed and pushed[-1] == "running", 5)
+        assert daemon._sup.console("boom")  # the fake server exits 1: a crash
+        # Down, waiting for the watchdog's restart: it must not read "running".
+        assert wait_for(lambda: running_state(daemon) == "restarting", 5)
+        doc = daemon.status_document()
+        assert doc["started"] is None
+        assert "crashed" in doc["last_action"] and "restart" in doc["last_action"]
+        assert wait_for(lambda: "restarting" in pushed, 5)
+        # The watchdog brings it back: running again, no crash loop.
+        assert wait_for(lambda: running_state(daemon) == "running", 20)
+        assert wait_for(lambda: pushed[-1] == "running", 5)
+        assert not daemon.status_document()["crash_loop"]
 
 
 def test_cli_commands_arrive_through_the_control_file(fleet_dir: Path) -> None:

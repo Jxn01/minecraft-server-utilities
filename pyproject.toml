@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcsu"
-version = "1.1.1"
+version = "1.1.2"
 description = "Minecraft Server Utilities — cross-platform tooling to run, back up, and babysit Minecraft servers across versions and mod loaders."
 readme = "README.md"
 requires-python = ">=3.11"

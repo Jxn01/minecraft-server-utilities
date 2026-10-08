@@ -295,9 +295,10 @@ class FleetDaemon:
         self._sup: Any = None
         self._thread: threading.Thread | None = None
         self._active: str | None = None
-        self._state = "stopped"  # stopped | starting | running | switching | stopping | crashed
+        self._state = "stopped"  # stopped|starting|running|restarting|switching|stopping|crashed
         self._crash_loop = False
         self._last_action = ""
+        self._restarts_seen = 0  # the supervisor's restart count when it was last ready
         self._stopping_on_purpose = False
         self._next_status = 0.0
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
@@ -421,6 +422,7 @@ class FleetDaemon:
             self._stopping_on_purpose = False
             self._save_state()
             self._sup = self._supervisor_factory(member.config)
+            self._restarts_seen = 0
             self._thread = threading.Thread(target=self._sup.run, name=f"mcsu-{name}", daemon=True)
             self._thread.start()
         self._last_action = f"Started {member.title}"
@@ -509,8 +511,22 @@ class FleetDaemon:
         if name is None or thread is None or sup is None:
             return
         if thread.is_alive():
+            before = self._state
+            restarts = getattr(sup, "restarts", 0)
             if sup.ready:
                 self._state = "running"
+                self._restarts_seen = restarts
+            elif restarts > self._restarts_seen:
+                # Down, and the watchdog is bringing it back after a crash -- not "running".
+                if self._state != "restarting":
+                    self._last_action = (
+                        f"{self.members[name].title} crashed; restarting (auto-restart #{restarts})"
+                    )
+                self._state = "restarting"
+            elif self._state == "running":
+                self._state = "starting"  # a planned restart (scheduled or requested)
+            if self._state != before:
+                self._publish_status(force=True)  # listeners (Home Assistant) hear it now
             return
         if self._stopping_on_purpose:
             return

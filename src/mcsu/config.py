@@ -96,8 +96,8 @@ class WatchdogConfig:
 
     enabled: bool = True
     check_interval: int = 15  # seconds between liveness checks
-    max_restarts: int = 5  # within the window before giving up (0 = unlimited)
-    restart_window: int = 600  # sliding window in seconds for max_restarts
+    max_restarts: int = 5  # crashes in a row before giving up (0 = unlimited)
+    restart_window: int = 600  # a crash this soon after a (re)start counts toward max_restarts
     restart_backoff: int = 5  # base seconds of backoff between auto-restarts
 
 

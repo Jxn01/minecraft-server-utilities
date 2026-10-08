@@ -7,8 +7,12 @@ Java or a network.
 
 from __future__ import annotations
 
+import os
+import stat
+import sys
 import threading
 import time
+from pathlib import Path
 
 from mcsu.config import config_from_dict
 from mcsu.events import EventType
@@ -129,6 +133,114 @@ def test_crash_loop_detection_gives_up(server_dir, fake_java):
     sup._handle_crash(1)
     assert sup._shutdown.is_set()
     assert any("loop" in e.message.lower() for e in errors)
+
+
+def _slow_boot_then_crash_java(tmp_path: Path, boot_seconds: float) -> Path:
+    """A 'server' that boots for ``boot_seconds``, prints Done, and dies at once -- a modpack
+    whose crash comes right after a long start."""
+    script = tmp_path / "slowcrash.py"
+    script.write_text(
+        "import sys, time\n"
+        f"time.sleep({boot_seconds})\n"
+        "print('[12:00:01] [Server thread/INFO]: Done (1.0s)! For help, type \"help\"')\n"
+        "sys.stdout.flush()\n"
+        "raise SystemExit(1)\n",
+        encoding="utf-8",
+    )
+    if os.name == "nt":
+        launcher = tmp_path / "slowcrash.bat"
+        launcher.write_text(f'@echo off\r\n"{sys.executable}" "{script}"\r\n', encoding="utf-8")
+        return launcher
+    launcher = tmp_path / "slowcrash"
+    launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}"\n', encoding="utf-8")
+    launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
+    return launcher
+
+
+def test_crash_loop_is_caught_however_long_each_boot_takes(server_dir, tmp_path):
+    """Regression: the window was wall-clock, so a pack booting longer than
+    restart_window / max_restarts that crashed right after "Done" never tripped the guard --
+    it booted and crashed forever (a real 1.12 modpack did, rewriting world data each time)."""
+    java = _slow_boot_then_crash_java(tmp_path, boot_seconds=2.5)
+    cfg = _config(
+        server_dir,
+        java,
+        watchdog={
+            "enabled": True,
+            "max_restarts": 3,
+            "restart_window": 6,
+            "restart_backoff": 0,
+            "check_interval": 1,
+        },
+    )
+    sup = Supervisor(cfg, console_mirror=False)
+    thread = threading.Thread(target=sup.run, daemon=True)
+    thread.start()
+    try:
+        # Each cycle (2.5 s boot + up to 1 s to notice) ends inside the 6 s window of its own
+        # start, so every crash counts and the fourth trips the guard. A wall-clock window would
+        # need three cycles inside 6 s -- under 2 s each -- so it never trips.
+        thread.join(timeout=40)
+        assert not thread.is_alive(), "the watchdog never gave up on the crash loop"
+        assert sup.gave_up
+        assert sup.restarts == 3
+    finally:
+        sup.shutdown()
+        thread.join(timeout=10)
+
+
+def test_a_crash_after_a_long_stable_run_starts_the_count_afresh(
+    server_dir, fake_java, monkeypatch
+):
+    cfg = _config(
+        server_dir,
+        fake_java,
+        watchdog={"enabled": True, "max_restarts": 1, "restart_window": 600, "restart_backoff": 0},
+    )
+    sup = Supervisor(cfg, console_mirror=False)
+    clock = [1000.0]
+    monkeypatch.setattr("mcsu.supervisor.time.monotonic", lambda: clock[0])
+
+    def fake_start():  # what the real start records
+        sup._started_at = clock[0]
+
+    sup._start_server = fake_start  # type: ignore[method-assign]
+    fake_start()
+    clock[0] += 60
+    sup._handle_crash(1)  # 60 s after its start: counts (1 of 1)
+    assert not sup._shutdown.is_set()
+    clock[0] += 3600
+    sup._handle_crash(1)  # after an hour up: an isolated crash, not a loop
+    assert not sup._shutdown.is_set()
+    clock[0] += 30
+    sup._handle_crash(1)  # 30 s after that restart: the second quick crash in a row
+    assert sup._shutdown.is_set() and sup.gave_up
+
+
+def test_a_process_seen_before_it_started_is_not_a_crash(server_dir, fake_java):
+    """Regression: a restart builds the new process, then starts it. A health check that read it
+    in between saw "not running" and -- once the lock let it in, with the server now up -- handled
+    a crash of a healthy server: a spurious restart, and a second JVM on the same world."""
+    cfg = _config(
+        server_dir,
+        fake_java,
+        watchdog={"enabled": True, "max_restarts": 5, "restart_window": 600, "restart_backoff": 0},
+    )
+    sup = Supervisor(cfg, console_mirror=False)
+    from types import SimpleNamespace
+
+    up = SimpleNamespace(pid=4242, returncode=None, is_running=lambda: True)
+    sup._proc = up  # type: ignore[assignment]
+    crashed, starts = [], []
+    sup.bus.subscribe(EventType.SERVER_CRASHED, lambda e: crashed.append(e))
+    sup._start_server = lambda: starts.append(1)  # type: ignore[method-assign]
+    sup._handle_crash(None, up)  # what the stale check reported
+    assert crashed == [] and starts == [], "a running server was handled as crashed"
+    # Positive control: the same process, really dead, is a crash.
+    dead = SimpleNamespace(pid=4242, returncode=1, is_running=lambda: False)
+    sup._proc = dead  # type: ignore[assignment]
+    sup._handle_crash(1, dead)
+    assert len(crashed) == 1 and starts == [1]
 
 
 def test_crash_with_watchdog_disabled_stops(server_dir, fake_java):

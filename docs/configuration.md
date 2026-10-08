@@ -88,8 +88,8 @@ RCON is how `mcsu` (and you) send commands to a running server.
 |---|---|---|---|
 | `enabled` | bool | `true` | Auto-restart the server if it exits unexpectedly. |
 | `check_interval` | duration | `15` | Liveness check cadence. |
-| `max_restarts` | int | `5` | Auto-restarts allowed within `restart_window` before giving up (0 = unlimited). |
-| `restart_window` | duration | `600` | Sliding window for `max_restarts`. |
+| `max_restarts` | int | `5` | Auto-restarts allowed for crashes **in a row** before giving up (0 = unlimited): the crash after the last allowed restart stops the supervisor. |
+| `restart_window` | duration | `600` | A crash counts toward `max_restarts` when it comes within this long of the server's own (re)start. A server that stayed up for a whole window before crashing starts the count afresh. Measured from each start, not as a wall-clock window, so a modpack that boots for minutes and dies right after "Done" is still caught. |
 | `restart_backoff` | duration | `5` | Base backoff between auto-restarts (grows with consecutive crashes). |
 
 ## `[notifications]`

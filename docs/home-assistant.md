@@ -40,7 +40,7 @@ so the only requirement is a broker Home Assistant uses — normally the
 | Entity | Id (default) | What it shows / does |
 |---|---|---|
 | Active server | `select.<node>_active_server` | `Off` + every server's title. **Choosing a server switches to it** (countdown + backup + clean stop of the old one); `Off` stops the running server. |
-| State | `sensor.<node>_state` | `stopped`, `starting`, `running`, `switching`, `stopping`, `crashed` |
+| State | `sensor.<node>_state` | `stopped`, `starting`, `running`, `restarting` (crashed, the watchdog is bringing it back), `switching`, `stopping`, `crashed` (gave up) — see [States](fleet.md#states) |
 | Players online | `sensor.<node>_players_online` | Count; attribute `players` = the names |
 | Server | `sensor.<node>_version` | Loader and Minecraft version of the active server, e.g. `Forge 1.18.2` |
 | Online since | `sensor.<node>_started` | Timestamp the active server finished starting |
@@ -74,6 +74,24 @@ Under `<base_topic>/<node>/` (default `mcsu/<node>/`):
 
 Discovery configs are published (retained) to
 `<discovery_prefix>/<component>/mcsu_<node>/<key>/config` on every connection.
+
+## Example: alert when the server dies unexpectedly
+
+`restarting` means the server crashed (a planned restart reads `starting`):
+
+```yaml
+automation:
+  - alias: "Minecraft server crashed"
+    triggers:
+      - trigger: state
+        entity_id: sensor.minecraft_state
+        to: "restarting"
+    actions:
+      - action: notify.notify
+        data:
+          title: "Minecraft server crashed"
+          message: "{{ states('sensor.minecraft_last_action') }}"
+```
 
 ## Example: alert on a crash loop
 
