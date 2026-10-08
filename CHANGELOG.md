@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] — 2026-10-08
+
+### Fixed
+
+- **Paper/Spigot/Purpur servers were never detected as ready**: their console
+  prints `[12:34:56 INFO]: ...`, which the line parser did not recognise, so the
+  "Done" line, joins, leaves and chat all went unseen. The parser now strips
+  ANSI colour codes and accepts every console prefix in use: vanilla, Forge
+  with a logger segment, Forge/NeoForge 1.17+ with a date, Fabric's
+  `(Logger)` style and Bukkit-style servers.
+
 ## [1.1.0] — 2026-10-08
 
 ### Added

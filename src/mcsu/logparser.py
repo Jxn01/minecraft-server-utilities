@@ -42,13 +42,23 @@ class ParsedLine:
     message: str | None = None
 
 
-# Leading "[12:34:56] [Server thread/INFO]:" style prefix. Forge/NeoForge may
-# insert an extra "[modid/]" segment; we capture time + level loosely.
+# The console prefix differs by server software, and only the body matters:
+#   vanilla/Fabric/Forge 1.12   [12:34:56] [Server thread/INFO]: body
+#   Forge with a logger segment [12:34:56] [Server thread/INFO] [net.minecraft.server.Foo]: body
+#   Forge/NeoForge 1.17+        [26May2023 19:14:33.593] [Server thread/INFO]
+#                               [net.minecraft.server.Foo/]: body
+#   Fabric logger style         [12:34:56] [Server thread/INFO] (Minecraft) body
+#   Paper/Spigot/Purpur         [12:34:56 INFO]: body
+# Paper's console was not recognised at all before 1.1.1: no "Done", so a Paper server never
+# counted as ready, and its joins/chat went unseen.
 _PREFIX = re.compile(
-    r"^\[(?P<time>\d{2}:\d{2}:\d{2})\]\s*"
+    r"^\[(?P<stamp>[^\]]*?(?P<time>\d{2}:\d{2}:\d{2})[^\]]*?)\]\s*"
     r"\[(?P<thread>[^/\]]+)/(?P<level>[A-Z]+)\]"
-    r"(?:\s*\[[^\]]*\])?:\s*(?P<body>.*)$"
+    r"(?:\s*\[[^\]]*\])?(?:\s*\([^)]*\))?:?\s*(?P<body>.*)$"
 )
+_BUKKIT_PREFIX = re.compile(r"^\[(?P<time>\d{2}:\d{2}:\d{2}) (?P<level>[A-Z]+)\]:?\s*(?P<body>.*)$")
+# Colour/formatting escape sequences some consoles emit even into a pipe (Paper's, notably).
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 # "Done (12.345s)! For help, type "help"" — emitted once the world is loaded.
 _READY = re.compile(r"Done \([0-9.,]+s\)!")
@@ -111,8 +121,8 @@ _ADVANCEMENT = re.compile(
 
 def parse_line(raw: str) -> ParsedLine:
     """Classify a single console line into a :class:`ParsedLine`."""
-    line = raw.rstrip("\r\n")
-    match = _PREFIX.match(line)
+    line = _ANSI.sub("", raw.rstrip("\r\n"))
+    match = _PREFIX.match(line) or _BUKKIT_PREFIX.match(line)
     if not match:
         # Lines without the standard prefix (stack traces, loader banners).
         return ParsedLine(kind=LineKind.PLAIN, raw=line)

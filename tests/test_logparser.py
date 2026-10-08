@@ -85,3 +85,42 @@ def test_join_message_not_treated_as_chat():
     parsed = parse_line("[12:08:00] [Server thread/INFO]: notch_join left the game")
     assert parsed.kind is LineKind.PLAYER_LEAVE
     assert parsed.player == "notch_join"
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '[12:34:56] [Server thread/INFO]: Done (1.234s)! For help, type "help"',
+        "[23:08:52] [Server thread/INFO] [net.minecraft.server.dedicated.DedicatedServer]: "
+        'Done (31.130s)! For help, type "help" or "?"',
+        "[26May2023 19:14:33.593] [Server thread/INFO] "
+        "[net.minecraft.server.dedicated.DedicatedServer/]: "
+        'Done (8.158s)! For help, type "help"',
+        '[12:34:56] [Server thread/INFO] (Minecraft) Done (3.210s)! For help, type "help"',
+        '[16:26:58 INFO]: Done (11.965s)! For help, type "help"',
+        '\x1b[0;39m[16:26:58 INFO]: \x1b[0;36mDone (11.965s)! For help, type "help"\x1b[m',
+    ],
+    ids=["vanilla", "forge-1.12", "forge-1.18", "fabric-logger", "paper", "paper-ansi"],
+)
+def test_ready_line_in_every_console_format(line: str) -> None:
+    assert parse_line(line).kind is LineKind.SERVER_READY
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "[16:30:01 INFO]: Steve joined the game",
+        "\x1b[33m[16:30:01 INFO]: Steve joined the game\x1b[m",
+    ],
+)
+def test_paper_joins_are_seen(line: str) -> None:
+    parsed = parse_line(line)
+    assert parsed.kind is LineKind.PLAYER_JOIN and parsed.player == "Steve"
+
+
+def test_paper_levels_are_read() -> None:
+    assert parse_line("[16:30:01 ERROR]: Something broke").kind is LineKind.ERROR
+    assert parse_line("[16:30:01 WARN]: Careful").kind is LineKind.WARNING
