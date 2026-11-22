@@ -114,6 +114,7 @@ class Running:
     """A FleetDaemon on a background thread for the duration of a test."""
 
     def __init__(self, fleet_dir: Path, **kw) -> None:  # type: ignore[no-untyped-def]
+        kw.setdefault("memory", lambda: None)  # tests never depend on the machine's free memory
         self.daemon = FleetDaemon(
             load_fleet(fleet_dir), resolver=lambda n: "069a79f4-44e9-4726-a5be-fca90e38aaf5", **kw
         )
@@ -254,6 +255,50 @@ def test_a_server_starts_with_its_mcsu_toml_as_it_is_now(fleet_dir: Path) -> Non
         daemon.request("start", "alpha")
         assert wait_for(lambda: "failed" in daemon.status_document()["last_action"])
         assert daemon.active == "beta" and running_state(daemon) == "running"
+
+
+def test_a_start_that_does_not_fit_is_refused_and_nothing_stops(fleet_dir: Path) -> None:
+    (fleet_dir / "fleet.toml").write_text(
+        (fleet_dir / "fleet.toml")
+        .read_text()
+        .replace("[fleet]\n", '[fleet]\nlow_memory_hint = "Stop the other service first."\n')
+    )
+    free = {"bytes": 64 * 1024**3}
+    with Running(fleet_dir, memory=lambda: free["bytes"]) as daemon:
+        daemon.request("start", "alpha")
+        assert wait_for(lambda: daemon.active == "alpha" and running_state(daemon) == "running")
+        alpha_sup = daemon._sup
+        free["bytes"] = (
+            100 * 1024**2
+        )  # alpha's 4 GiB comes back on a switch, still short of 4 GiB + 1 GiB
+        daemon.request("start", "beta")
+        assert wait_for(lambda: "not enough free memory" in daemon.status_document()["last_action"])
+        doc = daemon.status_document()
+        assert "Beta World" in doc["last_action"]
+        assert "Stop the other service first." in doc["last_action"]
+        assert daemon.active == "alpha" and alpha_sup._proc.is_running(), (
+            "a refused start stops nothing"
+        )
+
+
+def test_a_start_that_fits_proceeds(fleet_dir: Path) -> None:
+    with Running(fleet_dir, memory=lambda: 6 * 1024**3) as daemon:  # 4 GiB heap + 1 GiB margin fit
+        daemon.request("start", "alpha")
+        assert wait_for(lambda: daemon.active == "alpha" and running_state(daemon) == "running")
+
+
+def test_a_resume_that_does_not_fit_leaves_the_daemon_running(fleet_dir: Path) -> None:
+    with Running(fleet_dir) as daemon:
+        daemon.request("start", "beta")
+        assert wait_for(lambda: running_state(daemon) == "running")
+    with Running(fleet_dir, memory=lambda: 100 * 1024**2) as daemon:
+        assert wait_for(lambda: "not enough free memory" in daemon.status_document()["last_action"])
+        assert daemon.active is None
+
+
+def test_the_memory_settings_are_fleet_keys() -> None:
+    fleet = fleet_from_dict({"fleet": {"start_memory_margin": "2G", "low_memory_hint": "x"}})
+    assert (fleet.settings.start_memory_margin, fleet.settings.low_memory_hint) == ("2G", "x")
 
 
 def test_cli_commands_arrive_through_the_control_file(fleet_dir: Path) -> None:

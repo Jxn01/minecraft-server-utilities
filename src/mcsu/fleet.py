@@ -39,6 +39,7 @@ from typing import Any
 
 from mcsu.config import DEFAULT_CONFIG_NAME, ServerConfig, load_config
 from mcsu.errors import ConfigError, McsuError
+from mcsu.memory import available_bytes, check_fits, parse_size
 from mcsu.properties import Properties
 from mcsu.state import StateStore, pid_alive
 from mcsu.utils import format_duration
@@ -77,6 +78,8 @@ class FleetSettings:
     switch_message: str = "This server is closing in {time}: switching to {next}."
     stop_message: str = "This server is closing in {time}."
     shutdown_warning_seconds: int = 10  # countdown when the DAEMON stops (host shutdown)
+    start_memory_margin: str = "1G"  # a start needs its max heap + this much available memory
+    low_memory_hint: str = ""  # appended to a start refused for memory (what to stop first)
 
 
 @dataclass(slots=True)
@@ -284,8 +287,10 @@ class FleetDaemon:
         supervisor_factory: SupervisorFactory | None = None,
         bridge_factory: Callable[[FleetDaemon], Any] | None = None,
         resolver: Callable[[str], str | None] = mojang_uuid,
+        memory: Callable[[], int | None] = available_bytes,
     ) -> None:
         self.fleet = fleet
+        self._memory = memory
         self.members: dict[str, FleetMember] = {m.name: m for m in discover(fleet)}
         self._supervisor_factory = supervisor_factory or self._default_supervisor
         self._resolver = resolver
@@ -351,7 +356,11 @@ class FleetDaemon:
             wanted = persisted.get("active")
             if self.fleet.settings.resume and wanted in self.members:
                 log.info("Resuming %s", wanted)
-                self._start(str(wanted))
+                try:
+                    self._start(str(wanted))
+                except McsuError as exc:  # e.g. not enough memory: report it and keep the daemon up
+                    log.error("Resuming %s failed: %s", wanted, exc)
+                    self._last_action = f"Resuming failed: {exc}"
             self._publish_status(force=True)
             while not self._shutdown.is_set():
                 self._drain_control_file()
@@ -416,6 +425,7 @@ class FleetDaemon:
         # Its mcsu.toml as it is NOW: an edit since the daemon started (Java flags, memory, ...)
         # applies at this start. A broken file raises here, before the running server is touched.
         member.config = load_config(self.fleet.root_dir / name / DEFAULT_CONFIG_NAME)
+        self._check_memory(member)
         if self._active is not None:
             self._stop_active(next_title=member.title)
         with self._lock:
@@ -430,6 +440,19 @@ class FleetDaemon:
             self._thread.start()
         self._last_action = f"Started {member.title}"
         log.info("Started %s (%s)", member.title, name)
+
+    def _check_memory(self, member: FleetMember) -> None:
+        """Refuse a start whose heap does not fit, before anything running is touched."""
+        settings = self.fleet.settings
+        heap = parse_size(member.config.java.max_memory)
+        margin = parse_size(settings.start_memory_margin)
+        freed = 0
+        if self._active is not None and self._active != member.name and self._sup is not None:
+            freed = parse_size(self.members[self._active].config.java.max_memory)
+        reason = check_fits(heap, self._memory(), margin, freed)
+        if reason:
+            hint = f" {settings.low_memory_hint}" if settings.low_memory_hint else ""
+            raise McsuError(f"not enough free memory for {member.title}: {reason}.{hint}")
 
     def _stop_active(
         self, *, next_title: str | None, warn_seconds: list[int] | None = None, persist: bool = True

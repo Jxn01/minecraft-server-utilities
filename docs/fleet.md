@@ -51,6 +51,14 @@ daemon starts again — after a reboot, a power cut or `systemctl restart` — a
 `shutdown_warning_seconds`) **without** clearing that choice; only an explicit
 stop clears it.
 
+**Not enough memory.** A JVM started with `-XX:+AlwaysPreTouch` claims its whole heap at once,
+so before a server starts the daemon checks that its `max_memory` plus `start_memory_margin` fits
+in the host's available memory (the heap of a server it would stop for the switch counts as
+available). If not, the start is refused **before anything running is touched**, and the reason
+(with the numbers and `low_memory_hint`) becomes the status document's `last_action`, which Home
+Assistant shows. A resume after a daemon restart that does not fit is refused the same way, and the
+daemon keeps running. Where `/proc/meminfo` cannot be read (macOS, Windows) there is no check.
+
 **Crash loops.** Each server's own `[watchdog]` restarts it after a crash; while
 it is down and coming back the fleet reads `restarting` (never `running`), with
 `last_action` = `<title> crashed; restarting (auto-restart #N)`. If the
@@ -89,6 +97,8 @@ Unknown tables or keys are an error (typos fail loudly).
 | `switch_message` | string | `"This server is closing in {time}: switching to {next}."` | `{time}` = remaining time, `{next}` = the next server's title. |
 | `stop_message` | string | `"This server is closing in {time}."` | Used for stop and daemon shutdown. |
 | `shutdown_warning_seconds` | int (s) | `10` | Countdown when the daemon itself is stopped (host shutdown). Keep it short: the service manager's stop timeout must also cover a backup and the server's own stop. |
+| `start_memory_margin` | size | `"1G"` | A start needs the server's `max_memory` plus this much **available** memory (`MemAvailable` in `/proc/meminfo`), counting the heap of a server it would stop. Same units as Java's `-Xmx`: `512M`, `1G`, plain bytes. |
+| `low_memory_hint` | string | `""` | Appended to the message of a start refused for memory: what to stop first. |
 
 ### `[servers.<directory>]`
 

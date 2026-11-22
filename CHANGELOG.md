@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-11-22
+
+### Added
+
+- **A start that does not fit in memory is refused.** Before a server starts, the fleet checks
+  that its `max_memory` plus `[fleet] start_memory_margin` (default `1G`) fits in the host's
+  available memory, counting the heap of a server a switch would stop. A refused start touches
+  nothing that runs; the reason, with the numbers and `[fleet] low_memory_hint`, is the status
+  document's `last_action`. A resume that does not fit is refused the same way and the daemon
+  keeps running. Linux only (`/proc/meminfo`); elsewhere there is no check.
+
 ## [1.1.5] — 2026-10-08
 
 ### Fixed
